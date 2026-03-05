@@ -43,6 +43,45 @@ import { useTableCompactMode } from '../common/useTableCompactMode';
 export const useLogsData = () => {
   const { t } = useTranslation();
 
+  const toLocalUnixTimestamp = (value) => {
+    if (!value) return 0;
+
+    if (value instanceof Date) {
+      return Math.floor(value.getTime() / 1000);
+    }
+
+    if (typeof value === 'number') {
+      return value > 1e12 ? Math.floor(value / 1000) : value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      const localDateTimePattern =
+        /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
+      const match = normalized.match(localDateTimePattern);
+      if (match) {
+        const [, y, m, d, h = '0', mm = '0', s = '0'] = match;
+        return Math.floor(
+          new Date(
+            Number(y),
+            Number(m) - 1,
+            Number(d),
+            Number(h),
+            Number(mm),
+            Number(s),
+          ).getTime() / 1000,
+        );
+      }
+
+      const parsed = Date.parse(normalized);
+      if (!Number.isNaN(parsed)) {
+        return Math.floor(parsed / 1000);
+      }
+    }
+
+    return 0;
+  };
+
   // Define column keys for selection
   const COLUMN_KEYS = {
     TIME: 'time',
@@ -247,8 +286,8 @@ export const useLogsData = () => {
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
     let url = `/api/log/self/stat?type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}`;
     url = encodeURI(url);
     let res = await API.get(url);
@@ -272,8 +311,8 @@ export const useLogsData = () => {
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
     let url = `/api/log/stat?type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}`;
     url = encodeURI(url);
     let res = await API.get(url);
@@ -657,8 +696,8 @@ export const useLogsData = () => {
           ? formLogType
           : logType;
 
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
     if (isAdminUser) {
       url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&request_id=${request_id}`;
     } else {
