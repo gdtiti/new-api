@@ -18,13 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState } from 'react';
-import { Card, Spin } from '@douyinfe/semi-ui';
+import { Banner, Card, Spin, Space, Tag } from '@douyinfe/semi-ui';
 import SettingsGeneralPayment from '../../pages/Setting/Payment/SettingsGeneralPayment';
 import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentGateway';
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
+
+const PAY_METHOD_LABELS = {
+  wxpay: '微信支付',
+  alipay: '支付宝',
+  qqpay: 'QQ 钱包',
+  paypal: 'PayPal',
+  usdt: 'USDT',
+};
 
 const PaymentSetting = () => {
   const { t } = useTranslation();
@@ -131,9 +139,41 @@ const PaymentSetting = () => {
     onRefresh();
   }, []);
 
+  const renderPayMethods = () => {
+    const methods = (inputs.PayMethods || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (methods.length === 0) {
+      return <Tag color='red'>{t('未配置')}</Tag>;
+    }
+
+    return (
+      <Space wrap>
+        {methods.map((method) => (
+          <Tag key={method} color='blue'>
+            {PAY_METHOD_LABELS[method] || method}
+          </Tag>
+        ))}
+      </Space>
+    );
+  };
+
   return (
     <>
       <Spin spinning={loading} size='large'>
+        <Banner
+          fullMode={false}
+          type='info'
+          title={t('支付方式概览')}
+          description={
+            <div>
+              {t('当前支付方式')}：{renderPayMethods()}
+            </div>
+          }
+          style={{ marginTop: '10px' }}
+        />
         <Card style={{ marginTop: '10px' }}>
           <SettingsGeneralPayment options={inputs} refresh={onRefresh} />
         </Card>
