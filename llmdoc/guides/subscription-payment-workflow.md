@@ -13,8 +13,11 @@
 - 使用 `/api/subscription/admin/plans` 新增或更新套餐。`router/api-router.go:145-151`, `controller/subscription.go:110-255`。
 - 确保支付渠道字段可用（`stripe_price_id` 或 `creem_product_id`）。`controller/subscription_payment_stripe.go:40-43`, `controller/subscription_payment_creem.go:47-50`。
 - 若该套餐将作为注册赠送套餐，必须保持 `enabled=true`，否则后台配置保存会被拒绝。`controller/option.go:137-148`, `controller/option.go:162-173`。
+- 管理员可在设置页的“支付设置”标签查看页面顶部“支付方式概览”，快速核对当前 `PayMethods` JSON 配置是否已经加载到运行态。`web/src/pages/Setting/index.jsx:101-110`, `web/src/components/settings/PaymentSetting.jsx:196-214`。
 
 验证: `GET /api/subscription/admin/plans` 可看到新套餐
+
+验证: 设置页顶部 Banner 能展示当前支付方式标签；若未配置，则显示“未配置”
 
 ### Step 2: 配置注册默认赠送套餐（可选）
 
@@ -47,5 +50,6 @@
 | 返回“套餐未启用” | 检查套餐 `enabled` 状态。`controller/subscription_payment_stripe.go:36-39` |
 | 返回“已达到购买上限” | 调整 `max_purchase_per_user` 或清理历史订阅。`controller/subscription_payment_creem.go:67-76` |
 | 回调后未生效 | 检查回调验签是否通过、订单是否仍为 pending。`controller/subscription_payment_epay.go:145-153`, `model/subscription.go:529-531` |
+| 支付入口与预期不一致，或管理端看不到可用通道 | 先检查设置页“支付方式概览”是否与预期一致；若显示“未配置”或标签缺失，再回查 `PayMethods` 的 JSON 保存值。`web/src/components/settings/PaymentSetting.jsx:196-214`, `web/src/pages/Setting/Payment/SettingsPaymentGateway.jsx:114-119`, `web/src/pages/Setting/Payment/SettingsPaymentGateway.jsx:168-170` |
 | 注册成功但没有赠送订阅 | 检查 `RegisterDefaultSubscriptionEnabled` / `RegisterDefaultSubscriptionPlanId` 是否有效，以及系统错误日志是否记录套餐失效。`controller/option.go:128-176`, `model/user.go:499-503` |
 | 重试注册后担心重复赠送 | 核对 `user_subscriptions.grant_key=register_default` 是否仅一条；该键受幂等查询和唯一约束保护。`model/subscription.go:245-246`, `model/subscription.go:677-696` |

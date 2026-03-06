@@ -31,7 +31,61 @@ const PAY_METHOD_LABELS = {
   alipay: '支付宝',
   qqpay: 'QQ 钱包',
   paypal: 'PayPal',
+  stripe: 'Stripe',
   usdt: 'USDT',
+};
+
+const parsePayMethods = (rawPayMethods) => {
+  if (!rawPayMethods) {
+    return [];
+  }
+
+  try {
+    const parsedPayMethods = JSON.parse(rawPayMethods);
+    if (Array.isArray(parsedPayMethods)) {
+      return parsedPayMethods
+        .map((item) => {
+          if (typeof item === 'string') {
+            const methodType = item.trim();
+            if (!methodType) {
+              return null;
+            }
+            return {
+              type: methodType,
+              name: PAY_METHOD_LABELS[methodType] || methodType,
+            };
+          }
+
+          if (!item || typeof item !== 'object') {
+            return null;
+          }
+
+          const methodType =
+            typeof item.type === 'string' ? item.type.trim() : '';
+          const methodName =
+            typeof item.name === 'string' ? item.name.trim() : '';
+
+          if (!methodType && !methodName) {
+            return null;
+          }
+
+          return {
+            type: methodType || methodName,
+            name: methodName || PAY_METHOD_LABELS[methodType] || methodType,
+          };
+        })
+        .filter(Boolean);
+    }
+  } catch (error) {}
+
+  return rawPayMethods
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((methodType) => ({
+      type: methodType,
+      name: PAY_METHOD_LABELS[methodType] || methodType,
+    }));
 };
 
 const PaymentSetting = () => {
@@ -90,6 +144,18 @@ const PaymentSetting = () => {
               newInputs['AmountOptions'] = item.value;
             }
             break;
+          case 'PayMethods':
+            try {
+              newInputs[item.key] = JSON.stringify(
+                JSON.parse(item.value),
+                null,
+                2,
+              );
+            } catch (error) {
+              console.error('解析PayMethods出错:', error);
+              newInputs[item.key] = item.value;
+            }
+            break;
           case 'payment_setting.amount_discount':
             try {
               newInputs['AmountDiscount'] = JSON.stringify(
@@ -140,10 +206,7 @@ const PaymentSetting = () => {
   }, []);
 
   const renderPayMethods = () => {
-    const methods = (inputs.PayMethods || '')
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const methods = parsePayMethods(inputs.PayMethods);
 
     if (methods.length === 0) {
       return <Tag color='red'>{t('未配置')}</Tag>;
@@ -151,9 +214,9 @@ const PaymentSetting = () => {
 
     return (
       <Space wrap>
-        {methods.map((method) => (
-          <Tag key={method} color='blue'>
-            {PAY_METHOD_LABELS[method] || method}
+        {methods.map((method, index) => (
+          <Tag key={`${method.type}-${index}`} color='blue'>
+            {method.name}
           </Tag>
         ))}
       </Space>
