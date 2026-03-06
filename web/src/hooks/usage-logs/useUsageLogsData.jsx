@@ -36,51 +36,13 @@ import {
   renderAudioModelPrice,
   renderClaudeModelPrice,
   renderModelPrice,
+  toLocalUnixTimestamp,
 } from '../../helpers';
 import { ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 
 export const useLogsData = () => {
   const { t } = useTranslation();
-
-  const toLocalUnixTimestamp = (value) => {
-    if (!value) return 0;
-
-    if (value instanceof Date) {
-      return Math.floor(value.getTime() / 1000);
-    }
-
-    if (typeof value === 'number') {
-      return value > 1e12 ? Math.floor(value / 1000) : value;
-    }
-
-    if (typeof value === 'string') {
-      const normalized = value.trim();
-      const localDateTimePattern =
-        /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
-      const match = normalized.match(localDateTimePattern);
-      if (match) {
-        const [, y, m, d, h = '0', mm = '0', s = '0'] = match;
-        return Math.floor(
-          new Date(
-            Number(y),
-            Number(m) - 1,
-            Number(d),
-            Number(h),
-            Number(mm),
-            Number(s),
-          ).getTime() / 1000,
-        );
-      }
-
-      const parsed = Date.parse(normalized);
-      if (!Number.isNaN(parsed)) {
-        return Math.floor(parsed / 1000);
-      }
-    }
-
-    return 0;
-  };
 
   // Define column keys for selection
   const COLUMN_KEYS = {

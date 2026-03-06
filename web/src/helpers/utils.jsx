@@ -189,6 +189,79 @@ export function getTodayStartTimestamp() {
   return Math.floor(now.getTime() / 1000);
 }
 
+const LOCAL_DATE_TIME_PATTERN =
+  /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
+
+function parseLocalTimestampToMilliseconds(value) {
+  if (!value) return 0;
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.valueOf === 'function') {
+      const objectValue = value.valueOf();
+      if (typeof objectValue === 'number' && Number.isFinite(objectValue)) {
+        return objectValue > 1e12
+          ? Math.floor(objectValue)
+          : Math.floor(objectValue * 1000);
+      }
+    }
+    if (typeof value.toDate === 'function') {
+      const dateValue = value.toDate();
+      if (dateValue instanceof Date) {
+        return dateValue.getTime();
+      }
+    }
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0;
+    return value > 1e12 ? Math.floor(value) : Math.floor(value * 1000);
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (!normalized) return 0;
+
+    const numeric = Number(normalized);
+    if (Number.isFinite(numeric)) {
+      return numeric > 1e12 ? Math.floor(numeric) : Math.floor(numeric * 1000);
+    }
+
+    const match = normalized.match(LOCAL_DATE_TIME_PATTERN);
+    if (match) {
+      const [, y, m, d, h = '0', mm = '0', s = '0'] = match;
+      return new Date(
+        Number(y),
+        Number(m) - 1,
+        Number(d),
+        Number(h),
+        Number(mm),
+        Number(s),
+      ).getTime();
+    }
+
+    const parsed = Date.parse(normalized);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
+}
+
+export function toLocalUnixTimestamp(value) {
+  const milliseconds = parseLocalTimestampToMilliseconds(value);
+  if (milliseconds <= 0) return 0;
+  return Math.floor(milliseconds / 1000);
+}
+
+export function toLocalUnixMilliseconds(value) {
+  return parseLocalTimestampToMilliseconds(value);
+}
+
 export function timestamp2string(timestamp) {
   let date = new Date(timestamp * 1000);
   let year = date.getFullYear().toString();
