@@ -125,6 +125,55 @@ func UpdateOption(c *gin.Context) {
 
 			return
 		}
+	case "RegisterDefaultSubscriptionEnabled":
+		if option.Value == "true" {
+			if common.RegisterDefaultSubscriptionPlanId <= 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用注册默认订阅，请先配置默认订阅套餐！",
+				})
+				return
+			}
+			plan, err := model.GetSubscriptionPlanById(common.RegisterDefaultSubscriptionPlanId)
+			if err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用注册默认订阅，默认订阅套餐不存在！",
+				})
+				return
+			}
+			if !plan.Enabled {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用注册默认订阅，默认订阅套餐未启用！",
+				})
+				return
+			}
+		}
+	case "RegisterDefaultSubscriptionPlanId":
+		planId := common.String2Int(option.Value.(string))
+		if planId <= 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "默认订阅套餐无效",
+			})
+			return
+		}
+		plan, err := model.GetSubscriptionPlanById(planId)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "默认订阅套餐不存在",
+			})
+			return
+		}
+		if !plan.Enabled {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "默认订阅套餐未启用",
+			})
+			return
+		}
 	case "TelegramOAuthEnabled":
 		if option.Value == "true" && common.TelegramBotToken == "" {
 			c.JSON(http.StatusOK, gin.H{

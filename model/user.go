@@ -489,6 +489,25 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 			_ = inviteUser(inviterId)
 		}
 	}
+	GrantRegisterDefaultSubscriptionForUser(user.Id)
+}
+
+func GrantRegisterDefaultSubscriptionForUser(userId int) {
+	if userId <= 0 {
+		return
+	}
+	status, msg, err := GrantRegisterDefaultSubscription(userId)
+	if err != nil {
+		common.SysError(fmt.Sprintf("failed to grant register default subscription for user %d: %s", userId, err.Error()))
+		return
+	}
+	if status != "created" {
+		return
+	}
+	RecordLog(userId, LogTypeSystem, "新用户注册赠送默认订阅套餐")
+	if msg != "" {
+		RecordLog(userId, LogTypeSystem, msg)
+	}
 }
 
 func (user *User) Update(updatePassword bool) error {

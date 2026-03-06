@@ -101,6 +101,8 @@ var TelegramBotToken = ""
 var TelegramBotName = ""
 
 var QuotaForNewUser = 0
+var RegisterDefaultSubscriptionEnabled = false
+var RegisterDefaultSubscriptionPlanId = 0
 var QuotaForInviter = 0
 var QuotaForInvitee = 0
 var ChannelDisableThreshold = 5.0

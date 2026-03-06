@@ -81,6 +81,8 @@ const SystemSetting = () => {
     TurnstileSiteKey: '',
     TurnstileSecretKey: '',
     RegisterEnabled: '',
+    RegisterDefaultSubscriptionEnabled: '',
+    RegisterDefaultSubscriptionPlanId: '',
     'passkey.enabled': '',
     'passkey.rp_display_name': '',
     'passkey.rp_id': '',
@@ -125,6 +127,7 @@ const SystemSetting = () => {
   const [domainList, setDomainList] = useState([]);
   const [ipList, setIpList] = useState([]);
   const [allowedPorts, setAllowedPorts] = useState([]);
+  const [subscriptionPlans, setSubscriptionPlans] = useState([]);
 
   const getOptions = async () => {
     setLoading(true);
@@ -178,6 +181,7 @@ const SystemSetting = () => {
           case 'WeChatAuthEnabled':
           case 'TelegramOAuthEnabled':
           case 'RegisterEnabled':
+          case 'RegisterDefaultSubscriptionEnabled':
           case 'TurnstileCheckEnabled':
           case 'EmailDomainRestrictionEnabled':
           case 'EmailAliasRestrictionEnabled':
@@ -206,6 +210,7 @@ const SystemSetting = () => {
             break;
           case 'Price':
           case 'MinTopUp':
+          case 'RegisterDefaultSubscriptionPlanId':
             item.value = parseFloat(item.value);
             break;
           default:
@@ -236,6 +241,20 @@ const SystemSetting = () => {
 
   useEffect(() => {
     getOptions();
+  }, []);
+
+  useEffect(() => {
+    const loadSubscriptionPlans = async () => {
+      try {
+        const res = await API.get('/api/subscription/admin/plans');
+        if (res.data?.success) {
+          setSubscriptionPlans(res.data.data || []);
+        }
+      } catch (e) {
+        setSubscriptionPlans([]);
+      }
+    };
+    loadSubscriptionPlans();
   }, []);
 
   const updateOptions = async (options) => {
@@ -599,6 +618,25 @@ const SystemSetting = () => {
       options.push({
         key: 'TurnstileSecretKey',
         value: inputs.TurnstileSecretKey,
+      });
+    }
+
+    if (options.length > 0) {
+      await updateOptions(options);
+    }
+  };
+
+  const submitRegisterDefaultSubscription = async () => {
+    const options = [];
+
+    if (
+      originInputs['RegisterDefaultSubscriptionPlanId'] !==
+        inputs.RegisterDefaultSubscriptionPlanId &&
+      inputs.RegisterDefaultSubscriptionPlanId !== ''
+    ) {
+      options.push({
+        key: 'RegisterDefaultSubscriptionPlanId',
+        value: String(inputs.RegisterDefaultSubscriptionPlanId),
       });
     }
 
@@ -1025,6 +1063,18 @@ const SystemSetting = () => {
                         {t('允许新用户注册')}
                       </Form.Checkbox>
                       <Form.Checkbox
+                        field='RegisterDefaultSubscriptionEnabled'
+                        noLabel
+                        onChange={(e) =>
+                          handleCheckboxChange(
+                            'RegisterDefaultSubscriptionEnabled',
+                            e,
+                          )
+                        }
+                      >
+                        {t('新用户注册后默认赠送订阅套餐')}
+                      </Form.Checkbox>
+                      <Form.Checkbox
                         field='TurnstileCheckEnabled'
                         noLabel
                         onChange={(e) =>
@@ -1089,6 +1139,30 @@ const SystemSetting = () => {
                       >
                         {t('允许通过 OIDC 进行登录')}
                       </Form.Checkbox>
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                    style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Select
+                        field='RegisterDefaultSubscriptionPlanId'
+                        label={t('默认赠送订阅套餐')}
+                        placeholder={t('请选择订阅套餐')}
+                        optionList={(subscriptionPlans || []).map((item) => ({
+                          label: item?.plan?.title || `#${item?.plan?.id}`,
+                          value: item?.plan?.id,
+                          disabled: item?.plan?.enabled === false,
+                        }))}
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <div style={{ marginTop: 30 }}>
+                        <Button onClick={submitRegisterDefaultSubscription}>
+                          {t('保存默认订阅设置')}
+                        </Button>
+                      </div>
                     </Col>
                   </Row>
                 </Form.Section>

@@ -183,6 +183,7 @@ func Register(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	model.GrantRegisterDefaultSubscriptionForUser(cleanUser.Id)
 
 	// 获取插入后的用户ID
 	var insertedUser model.User
