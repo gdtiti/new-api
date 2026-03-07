@@ -152,6 +152,10 @@ func UpdateOption(c *gin.Context) {
 		}
 	case "RegisterDefaultSubscriptionPlanId":
 		planId := common.String2Int(option.Value.(string))
+		if planId <= 0 && !common.RegisterDefaultSubscriptionEnabled {
+			option.Value = "0"
+			break
+		}
 		if planId <= 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,

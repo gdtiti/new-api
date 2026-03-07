@@ -210,8 +210,21 @@ const SystemSetting = () => {
             break;
           case 'Price':
           case 'MinTopUp':
-          case 'RegisterDefaultSubscriptionPlanId':
             item.value = parseFloat(item.value);
+            break;
+          case 'RegisterDefaultSubscriptionPlanId':
+            if (
+              item.value === '' ||
+              item.value === null ||
+              item.value === undefined
+            ) {
+              item.value = '';
+              break;
+            }
+            item.value = parseFloat(item.value);
+            if (!Number.isFinite(item.value) || item.value <= 0) {
+              item.value = '';
+            }
             break;
           default:
             break;
@@ -628,15 +641,13 @@ const SystemSetting = () => {
 
   const submitRegisterDefaultSubscription = async () => {
     const options = [];
+    const currentPlanId = inputs.RegisterDefaultSubscriptionPlanId ?? '';
+    const originPlanId = originInputs['RegisterDefaultSubscriptionPlanId'] ?? '';
 
-    if (
-      originInputs['RegisterDefaultSubscriptionPlanId'] !==
-        inputs.RegisterDefaultSubscriptionPlanId &&
-      inputs.RegisterDefaultSubscriptionPlanId !== ''
-    ) {
+    if (originPlanId !== currentPlanId) {
       options.push({
         key: 'RegisterDefaultSubscriptionPlanId',
-        value: String(inputs.RegisterDefaultSubscriptionPlanId),
+        value: currentPlanId === '' ? '' : String(currentPlanId),
       });
     }
 
@@ -1150,6 +1161,7 @@ const SystemSetting = () => {
                         field='RegisterDefaultSubscriptionPlanId'
                         label={t('默认赠送订阅套餐')}
                         placeholder={t('请选择订阅套餐')}
+                        showClear
                         optionList={(subscriptionPlans || []).map((item) => ({
                           label: item?.plan?.title || `#${item?.plan?.id}`,
                           value: item?.plan?.id,
