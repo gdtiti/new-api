@@ -30,6 +30,16 @@ type ModelRequest struct {
 func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		var channel *model.Channel
+		requestPath := c.Request.URL.Path
+		var channelFilter model.ChannelFilter
+		if service.ShouldRestrictOpenAIUpstreamByRequestPath(requestPath) {
+			channelFilter = func(candidate *model.Channel) bool {
+				if candidate == nil {
+					return false
+				}
+				return service.IsAllowedOpenAIUpstreamChannelType(candidate.Type)
+			}
+		}
 		channelId, ok := common.GetContextKey(c, constant.ContextKeyTokenSpecificChannelId)
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
 		if err != nil {
@@ -49,6 +59,10 @@ func Distribute() func(c *gin.Context) {
 			}
 			if channel.Status != common.ChannelStatusEnabled {
 				abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
+				return
+			}
+			if channelFilter != nil && !channelFilter(channel) {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "当前请求已启用 OpenAI 下游严格上游限制，仅允许 OpenAI/Codex 渠道")
 				return
 			}
 		} else {
@@ -102,6 +116,11 @@ func Distribute() func(c *gin.Context) {
 				if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found {
 					preferred, err := model.CacheGetChannel(preferredChannelID)
 					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled {
+						if channelFilter != nil && !channelFilter(preferred) {
+							preferred = nil
+						}
+					}
+					if preferred != nil {
 						if usingGroup == "auto" {
 							userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 							autoGroups := service.GetUserAutoGroup(userGroup)
@@ -124,10 +143,11 @@ func Distribute() func(c *gin.Context) {
 
 				if channel == nil {
 					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:        c,
-						ModelName:  modelRequest.Model,
-						TokenGroup: usingGroup,
-						Retry:      common.GetPointer(0),
+						Ctx:           c,
+						ModelName:     modelRequest.Model,
+						TokenGroup:    usingGroup,
+						Retry:         common.GetPointer(0),
+						ChannelFilter: channelFilter,
 					})
 					if err != nil {
 						showGroup := usingGroup
