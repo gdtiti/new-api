@@ -177,12 +177,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}()
 
-	retryParam := &service.RetryParam{
-		Ctx:        c,
-		TokenGroup: relayInfo.TokenGroup,
-		ModelName:  relayInfo.OriginModelName,
-		Retry:      common.GetPointer(0),
-	}
+	retryParam := newRetryParam(c, relayInfo.TokenGroup, relayInfo.OriginModelName, relayInfo.RequestURLPath)
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
 
@@ -252,6 +247,24 @@ func addUsedChannel(c *gin.Context, channelId int) {
 	useChannel := c.GetStringSlice("use_channel")
 	useChannel = append(useChannel, fmt.Sprintf("%d", channelId))
 	c.Set("use_channel", useChannel)
+}
+
+func newRetryParam(c *gin.Context, tokenGroup string, modelName string, requestPath string) *service.RetryParam {
+	retryParam := &service.RetryParam{
+		Ctx:        c,
+		TokenGroup: tokenGroup,
+		ModelName:  modelName,
+		Retry:      common.GetPointer(0),
+	}
+	if service.ShouldRestrictOpenAIUpstreamByRequestPath(requestPath) {
+		retryParam.ChannelFilter = func(channel *model.Channel) bool {
+			if channel == nil {
+				return false
+			}
+			return service.IsChannelTypeAllowedForRequestPath(channel.Type, requestPath)
+		}
+	}
+	return retryParam
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
@@ -497,12 +510,7 @@ func RelayTask(c *gin.Context) {
 		}
 	}()
 
-	retryParam := &service.RetryParam{
-		Ctx:        c,
-		TokenGroup: relayInfo.TokenGroup,
-		ModelName:  relayInfo.OriginModelName,
-		Retry:      common.GetPointer(0),
-	}
+	retryParam := newRetryParam(c, relayInfo.TokenGroup, relayInfo.OriginModelName, relayInfo.RequestURLPath)
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		var channel *model.Channel

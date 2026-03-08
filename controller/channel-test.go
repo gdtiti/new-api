@@ -246,12 +246,10 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	request.SetModelName(testModel)
 
 	apiType, _ := common.ChannelType2APIType(channel.Type)
-	if info.RelayMode == relayconstant.RelayModeResponsesCompact &&
-		apiType != constant.APITypeOpenAI &&
-		apiType != constant.APITypeCodex {
+	if !service.IsAPITypeAllowedForRelayFormat(apiType, relayFormat) {
 		return testResult{
 			context:     c,
-			localErr:    fmt.Errorf("responses compaction test only supports openai/codex channels, got api type %d", apiType),
+			localErr:    fmt.Errorf("relay format %s only supports openai/codex compatible upstream, got api type %d", string(relayFormat), apiType),
 			newAPIError: types.NewError(fmt.Errorf("unsupported api type: %d", apiType), types.ErrorCodeInvalidApiType),
 		}
 	}
