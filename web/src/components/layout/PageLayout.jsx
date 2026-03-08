@@ -68,7 +68,9 @@ const PageLayout = () => {
     location.pathname !== '/console/playground';
 
   const isConsoleRoute = location.pathname.startsWith('/console');
+  const isPortalRoute = location.pathname.startsWith('/app');
   const showSider = isConsoleRoute && (!isMobile || drawerOpen);
+  const shouldShowHeader = !isPortalRoute;
 
   useEffect(() => {
     if (isMobile && drawerOpen && collapsed) {
@@ -125,28 +127,30 @@ const PageLayout = () => {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        overflow: isMobile ? 'visible' : 'hidden',
+        overflow: isPortalRoute || isMobile ? 'visible' : 'hidden',
       }}
     >
-      <Header
-        style={{
-          padding: 0,
-          height: 'auto',
-          lineHeight: 'normal',
-          position: 'fixed',
-          width: '100%',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <HeaderBar
-          onMobileMenuToggle={() => setDrawerOpen((prev) => !prev)}
-          drawerOpen={drawerOpen}
-        />
-      </Header>
+      {shouldShowHeader && (
+        <Header
+          style={{
+            padding: 0,
+            height: 'auto',
+            lineHeight: 'normal',
+            position: 'fixed',
+            width: '100%',
+            top: 0,
+            zIndex: 100,
+          }}
+        >
+          <HeaderBar
+            onMobileMenuToggle={() => setDrawerOpen((prev) => !prev)}
+            drawerOpen={drawerOpen}
+          />
+        </Header>
+      )}
       <Layout
         style={{
-          overflow: isMobile ? 'visible' : 'auto',
+          overflow: isPortalRoute || isMobile ? 'visible' : 'auto',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -186,15 +190,20 @@ const PageLayout = () => {
           <Content
             style={{
               flex: '1 0 auto',
-              overflowY: isMobile ? 'visible' : 'hidden',
+              overflowY: isPortalRoute ? 'auto' : isMobile ? 'visible' : 'hidden',
               WebkitOverflowScrolling: 'touch',
-              padding: shouldInnerPadding ? (isMobile ? '5px' : '24px') : '0',
+              padding:
+                shouldInnerPadding && !isPortalRoute
+                  ? isMobile
+                    ? '5px'
+                    : '24px'
+                  : '0',
               position: 'relative',
             }}
           >
             <App />
           </Content>
-          {!shouldHideFooter && (
+          {!shouldHideFooter && !isPortalRoute && (
             <Layout.Footer
               style={{
                 flex: '0 0 auto',
