@@ -17,8 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@douyinfe/semi-ui';
 import {
   API,
@@ -44,6 +45,8 @@ import ParamOverrideEntry from '../../components/table/usage-logs/components/Par
 
 export const useLogsData = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const appliedSearchRef = useRef('');
 
   // Define column keys for selection
   const COLUMN_KEYS = {
@@ -92,20 +95,25 @@ export const useLogsData = () => {
 
   // Form state
   const [formApi, setFormApi] = useState(null);
-  let now = new Date();
-  const formInitValues = {
-    username: '',
-    token_name: '',
-    model_name: '',
-    channel: '',
-    group: '',
-    request_id: '',
-    dateRange: [
-      timestamp2string(getTodayStartTimestamp()),
-      timestamp2string(now.getTime() / 1000 + 3600),
-    ],
-    logType: '0',
-  };
+  const formInitValues = useMemo(() => {
+    const startTimestamp =
+      searchParams.get('start_timestamp') ||
+      timestamp2string(getTodayStartTimestamp());
+    const endTimestamp =
+      searchParams.get('end_timestamp') ||
+      timestamp2string(Math.floor(Date.now() / 1000) + 3600);
+
+    return {
+      username: '',
+      token_name: searchParams.get('token_name') || '',
+      model_name: searchParams.get('model_name') || '',
+      channel: '',
+      group: searchParams.get('group') || '',
+      request_id: searchParams.get('request_id') || '',
+      dateRange: [startTimestamp, endTimestamp],
+      logType: searchParams.get('logType') || '0',
+    };
+  }, [searchParams]);
 
   // Get default column visibility based on user role
   const getDefaultColumnVisibility = () => {
@@ -233,10 +241,10 @@ export const useLogsData = () => {
 
   // 获取表单值的辅助函数，确保所有值都是字符串
   const getFormValues = () => {
-    const formValues = formApi ? formApi.getValues() : {};
+    const formValues = formApi ? formApi.getValues() : formInitValues;
 
-    let start_timestamp = timestamp2string(getTodayStartTimestamp());
-    let end_timestamp = timestamp2string(now.getTime() / 1000 + 3600);
+    let start_timestamp = formInitValues.dateRange[0];
+    let end_timestamp = formInitValues.dateRange[1];
 
     if (
       formValues.dateRange &&
@@ -819,6 +827,28 @@ export const useLogsData = () => {
       handleEyeClick();
     }
   }, [formApi]);
+
+  useEffect(() => {
+    if (!formApi) {
+      return;
+    }
+
+    const currentSearchKey = searchParams.toString();
+    if (appliedSearchRef.current === currentSearchKey) {
+      return;
+    }
+
+    const shouldRefresh = appliedSearchRef.current !== '';
+    formApi.setValues(formInitValues);
+    setLogType(Number(formInitValues.logType) || 0);
+    appliedSearchRef.current = currentSearchKey;
+
+    if (shouldRefresh) {
+      setTimeout(() => {
+        refresh().then();
+      }, 0);
+    }
+  }, [formApi, formInitValues, refresh, searchParams]);
 
   // Check if any record has expandable content
   const hasExpandableRows = () => {

@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect, useContext, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { API, copy, showError, showInfo, showSuccess } from '../../helpers';
 import { Modal } from '@douyinfe/semi-ui';
 import { UserContext } from '../../context/User';
@@ -26,8 +27,10 @@ import { StatusContext } from '../../context/Status';
 
 export const useModelPricingData = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const [searchValue, setSearchValue] = useState('');
   const compositionRef = useRef({ isComposition: false });
+  const openedFromQueryRef = useRef('');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [isModalOpenurl, setIsModalOpenurl] = useState(false);
@@ -318,6 +321,43 @@ export const useModelPricingData = () => {
   useEffect(() => {
     refresh().then();
   }, []);
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    const keyword =
+      search.get('q') || search.get('model_name') || search.get('model') || '';
+    if (!keyword) {
+      return;
+    }
+    setSearchValue(keyword);
+  }, [location.search]);
+
+  useEffect(() => {
+    if (models.length === 0) {
+      return;
+    }
+
+    const search = new URLSearchParams(location.search);
+    const exactModel = search.get('model');
+    if (!exactModel) {
+      openedFromQueryRef.current = '';
+      return;
+    }
+    if (openedFromQueryRef.current === exactModel.toLowerCase()) {
+      return;
+    }
+
+    const matchedModel = models.find(
+      (model) => model.model_name?.toLowerCase() === exactModel.toLowerCase(),
+    );
+    if (!matchedModel) {
+      return;
+    }
+
+    setSelectedModel(matchedModel);
+    setShowModelDetail(true);
+    openedFromQueryRef.current = exactModel.toLowerCase();
+  }, [location.search, models]);
 
   // 当筛选条件变化时重置到第一页
   useEffect(() => {
