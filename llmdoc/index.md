@@ -17,6 +17,7 @@
 - `architecture/task-platform-relay.md` - 异步任务平台提交/轮询/计费链路。
 - `architecture/system-init-setup.md` - 系统启动初始化与 Setup 一次性流程。
 - `architecture/frontend-routing-guards.md` - 前端路由表与登录/管理员/初始化守卫。
+- `architecture/customer-portal.md` - 客户门户（/app）路由壳、页面模块与数据链路。
 - `architecture/runtime-protection-middleware.md` - 运行时防护中间件链（限流、性能、恢复、清理、CORS）。
 
 ## 指南（guides）

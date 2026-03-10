@@ -18,6 +18,7 @@
 | ---- | ------ | ------- |
 | `router/relay-router.go` | `SetRelayRouter` | 挂载 `/v1`、`/v1beta`、`/mj`、`/suno` 等协议入口 |
 | `middleware/distributor.go` | `Distribute` | 提取模型并注入选中渠道上下文 |
+| `service/openai_downstream_routing_guard.go` | `ShouldRestrictOpenAIUpstreamByRequestPath` | OpenAI 下游严格上游限制（按 path 约束候选上游渠道） |
 | `controller/relay.go` | `Relay` | 统一处理请求验证、计费预扣、重试、错误输出 |
 | `controller/relay.go` | `relayHandler` | 根据 RelayMode 分派 Text/Image/Audio/Embedding/Rerank |
 | `controller/relay.go` | `processChannelError` | 渠道错误记录、自动封禁、错误日志写入 |
@@ -26,9 +27,11 @@
 
 1. 请求命中 relay 路由组并依次经过性能检查、令牌鉴权、模型级限流、分发中间件。`router/relay-router.go:69-86`  
 2. `TokenAuth` 兼容 `Authorization/x-api-key/x-goog-api-key/query key` 等来源并写入 token 上下文。`middleware/auth.go:248-364`  
-3. `Distribute` 从路径/Body推断模型与模式，选渠道并调用 `SetupContextForSelectedChannel` 注入渠道参数。`middleware/distributor.go:176-338`, `middleware/distributor.go:340-401`  
+3. `Distribute` 从路径/Body推断模型与模式，选渠道并调用 `SetupContextForSelectedChannel` 注入渠道参数。`middleware/distributor.go:44-179`, `middleware/distributor.go:360-406`  
+   - 若启用 `global.openai_downstream_strict_upstream_enabled` 且请求 path 命中 OpenAI 下游协议（`/v1/chat/completions`、`/v1/responses`、`/v1/responses/compact*`），会注入 `ChannelFilter`，只允许 OpenAI/Codex 渠道参与选路。`middleware/distributor.go:35-65`, `service/openaicompat/strict_upstream.go:26-62`  
 4. `Relay` 做请求校验、敏感词检查、token 估算、价格计算与预扣费。`controller/relay.go:108-167`  
 5. 进入重试循环：每轮拿渠道、恢复可重读请求体、调用对应 helper。`controller/relay.go:189-235`  
+   - 重试参数通过 `newRetryParam` 继续携带 `ChannelFilter`，避免重试扩散到不允许的上游集合。`controller/relay.go:252-270`  
 6. 成功即返回；失败按错误类型决定重试/终止，并记录渠道错误链路。`controller/relay.go:227-235`, `controller/relay.go:318-345`  
 
 ## 失败与边界情况
@@ -37,6 +40,7 @@
 - WebSocket realtime 单独升级与错误回包格式。`controller/relay.go:78-86`, `controller/relay.go:93-95`  
 - Claude 与 OpenAI 错误响应结构不同。`controller/relay.go:95-103`  
 - 指定渠道（`specific_channel_id`）时禁止常规重试扩散。`controller/relay.go:334-336`  
+- 启用 OpenAI 下游严格上游限制时，若指定渠道不满足约束会直接 `403` 拒绝（避免“下游协议为 OpenAI，但上游选到非 OpenAI 兼容渠道”）。`middleware/distributor.go:65`  
 
 ## Related
 

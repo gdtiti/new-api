@@ -7,6 +7,7 @@
 - 复杂模块配置通过 `setting/config.ConfigManager` 注册并扁平化存储。  
 - 必须支持运行时热同步，不依赖重启生效。  
 - `RegisterDefaultSubscriptionEnabled` 与 `RegisterDefaultSubscriptionPlanId` 控制“注册默认赠送订阅”，保存时必须做套餐存在性与启用状态校验。  
+- `global.openai_downstream_strict_upstream_enabled` 控制 OpenAI 下游严格上游限制开关：开启后 OpenAI 下游协议请求只允许走 OpenAI/Codex 上游渠道（避免跨协议转换）。  
 
 ## Source of Truth
 
@@ -29,6 +30,7 @@
 - `performance_setting.*`：性能阈值配置。`setting/performance_setting/config.go`  
 - `RegisterDefaultSubscriptionEnabled`：是否在注册成功后触发默认订阅发放。`common/constants.go:103-105`  
 - `RegisterDefaultSubscriptionPlanId`：目标 `SubscriptionPlan.Id`，必须指向已启用套餐。`controller/option.go:153-176`  
+- `global.openai_downstream_strict_upstream_enabled`：OpenAI 下游严格上游限制开关（保存于 OptionMap，通过 `ConfigManager` 热更新）。`setting/model_setting/global.go:33-50`, `service/openaicompat/strict_upstream.go:12-63`  
 
 ## 约束
 

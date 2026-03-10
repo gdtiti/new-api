@@ -11,17 +11,19 @@
 | ---- | ------ | ------- |
 | `middleware/distributor.go` | `Distribute` | 解析模型/分组，执行首次选路与上下文装配 |
 | `service/channel_select.go` | `CacheGetRandomSatisfiedChannel` | auto 分组、跨组重试、优先级推进 |
+| `model/channel_cache.go` | `ChannelFilter` / `GetRandomSatisfiedChannelWithFilter` | 在候选集层做渠道过滤（例如严格上游限制） |
 | `middleware/distributor.go` | `SetupContextForSelectedChannel` | 注入渠道 key/baseURL/modelMapping/override |
 | `service/channel_affinity.go` | `GetPreferredChannelByAffinity`/`RecordChannelAffinity` | 粘滞选路与成功后回写 |
 | `controller/relay.go` | `shouldRetry` | 按错误类型、状态码、配置判断重试 |
 
 ## Execution Flow
 
-1. `Distribute` 从路径和请求体提取模型名、relay mode、group。`middleware/distributor.go:176-338`  
+1. `Distribute` 从路径和请求体提取模型名、relay mode、group；必要时构造 `ChannelFilter`（例如 OpenAI 下游严格上游限制）。`middleware/distributor.go:31-75`, `middleware/distributor.go:196-358`  
 2. 若 token 绑定固定渠道先走直连，否则做模型权限校验。`middleware/distributor.go:33-75`  
 3. 先尝试 affinity 命中；失败回退随机可用渠道选择。`middleware/distributor.go:102-132`  
-4. 选中后把 key、baseURL、header/param override 等写入 context。`middleware/distributor.go:340-401`  
-5. 请求成功且状态<400时记录 affinity，供下次复用。`middleware/distributor.go:156-158`  
+4. 随机选路通过 `CacheGetRandomSatisfiedChannel` 调用 `model.GetRandomSatisfiedChannelWithFilter`，在优先级/权重选择前先执行 `ChannelFilter`（若为空则不影响原语义）。`service/channel_select.go:84-172`, `model/channel_cache.go:96-120`  
+5. 选中后把 key、baseURL、header/param override 等写入 context。`middleware/distributor.go:360-406`  
+6. 请求成功且状态<400时记录 affinity，供下次复用。`middleware/distributor.go:156-158`  
 
 ## 失败与边界
 
@@ -29,6 +31,7 @@
 - auto 分组在当前分组无可用渠道时切换下一分组并重置重试索引。`service/channel_select.go:118-129`  
 - 指定渠道、skip-retry、状态码策略会抑制重试。`controller/relay.go:322-345`  
 - affinity 规则可标记“失败后不重试”。`service/channel_affinity.go:27`, `setting/operation_setting/channel_affinity_setting.go:23-27`  
+- 当 `ChannelFilter` 过滤后无可用渠道时，表现为“没有可用渠道/模型不存在”；用于将重试、auto 分组等机制限制在更小的候选集合内（如严格上游限制）。`middleware/distributor.go:35-65`, `model/channel_cache.go:102-120`  
 
 ## Related
 

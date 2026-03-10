@@ -3,7 +3,7 @@
 ## 项目定位
 
 - **定位**：统一 AI API 网关（gateway/proxy），聚合多上游模型厂商并提供统一调用入口。参考：`main.go:43` (main), `router/main.go:16` (SetRouter)
-- **系统角色**：同时包含 API 中转、用户与配额管理、渠道管理、管理后台前端。参考：`router/main.go:17-20` (SetApiRouter/SetDashboardRouter/SetRelayRouter/SetVideoRouter)
+- **系统角色**：同时包含 API 中转、用户与配额管理、渠道管理、Web 前端（管理后台 `/console/*` + 客户门户 `/app/*`）。参考：`router/main.go:17-20` (SetApiRouter/SetDashboardRouter/SetRelayRouter/SetVideoRouter), `web/src/App.jsx:111-357`
 
 ## 目标用户
 
