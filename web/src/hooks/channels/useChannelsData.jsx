@@ -90,6 +90,9 @@ export const useChannelsData = () => {
   const [modelTablePage, setModelTablePage] = useState(1);
   const [selectedEndpointType, setSelectedEndpointType] = useState('');
   const [isStreamTest, setIsStreamTest] = useState(false);
+  const [selectedBaseUrlId, setSelectedBaseUrlId] = useState(0);
+  const [baseUrlOptions, setBaseUrlOptions] = useState([]);
+  const [baseUrlOptionsLoading, setBaseUrlOptionsLoading] = useState(false);
   const [globalPassThroughEnabled, setGlobalPassThroughEnabled] =
     useState(false);
 
@@ -113,10 +116,108 @@ export const useChannelsData = () => {
 
   // 使用 ref 来避免闭包问题，类似旧版实现
   const shouldStopBatchTestingRef = useRef(false);
+  const baseUrlOptionsRequestIdRef = useRef(0);
+
+  const normalizeEnabled = (value) => {
+    return value === true || value === 1 || value === '1';
+  };
+
+  const loadChannelBaseUrlOptions = async (channelId) => {
+    if (!channelId) {
+      setBaseUrlOptions([]);
+      return;
+    }
+    const requestId = ++baseUrlOptionsRequestIdRef.current;
+    setBaseUrlOptionsLoading(true);
+    try {
+      const res = await API.post('/api/channel/base_url/manage', {
+        channel_id: channelId,
+        action: 'list',
+      });
+      const { success, message, data } = res?.data || {};
+      if (!success) {
+        if (baseUrlOptionsRequestIdRef.current !== requestId) {
+          return;
+        }
+        setBaseUrlOptions([]);
+        if (message) {
+          showError(message);
+        }
+        return;
+      }
+      if (baseUrlOptionsRequestIdRef.current !== requestId) {
+        return;
+      }
+      const list =
+        data?.items || data?.base_urls || data?.list || data?.urls || [];
+      const items = Array.isArray(list) ? list : [];
+      const options = items.map((item, idx) => {
+        const rawId = item?.base_url_id ?? item?.id ?? idx;
+        const idNum = Number(rawId);
+        const enabled = normalizeEnabled(item?.enabled);
+        const url = item?.url || '';
+        const label = url
+          ? enabled
+            ? url
+            : `${url} (${t('已禁用')})`
+          : `#${rawId}`;
+        return {
+          value: Number.isFinite(idNum) ? idNum : rawId,
+          label,
+        };
+      });
+      if (baseUrlOptionsRequestIdRef.current === requestId) {
+        setBaseUrlOptions(options);
+      }
+    } catch (error) {
+      if (baseUrlOptionsRequestIdRef.current === requestId) {
+        setBaseUrlOptions([]);
+      }
+    } finally {
+      if (baseUrlOptionsRequestIdRef.current === requestId) {
+        setBaseUrlOptionsLoading(false);
+      }
+    }
+  };
+
+  const refreshChannelBaseUrlOptions = async (updatedChannelId) => {
+    const currentChannelId = currentTestChannel?.id;
+    if (!showModelTestModal) {
+      return;
+    }
+    if (!updatedChannelId || !currentChannelId) {
+      return;
+    }
+    if (Number(updatedChannelId) !== Number(currentChannelId)) {
+      return;
+    }
+    await loadChannelBaseUrlOptions(updatedChannelId);
+  };
+
+  useEffect(() => {
+    if (!showModelTestModal) {
+      baseUrlOptionsRequestIdRef.current += 1;
+      setSelectedBaseUrlId(0);
+      setBaseUrlOptions([]);
+      setBaseUrlOptionsLoading(false);
+      return;
+    }
+    if (!currentTestChannel?.id) {
+      setSelectedBaseUrlId(0);
+      setBaseUrlOptions([]);
+      return;
+    }
+    setSelectedBaseUrlId(0);
+    loadChannelBaseUrlOptions(currentTestChannel.id);
+  }, [showModelTestModal, currentTestChannel?.id]);
 
   // Multi-key management states
   const [showMultiKeyManageModal, setShowMultiKeyManageModal] = useState(false);
   const [currentMultiKeyChannel, setCurrentMultiKeyChannel] = useState(null);
+
+  // BaseURL management states
+  const [showBaseUrlManageModal, setShowBaseUrlManageModal] = useState(false);
+  const [currentBaseUrlChannel, setCurrentBaseUrlChannel] = useState(null);
 
   // Refs
   const requestCounter = useRef(0);
@@ -864,6 +965,7 @@ export const useChannelsData = () => {
     model,
     endpointType = '',
     stream = false,
+    baseUrlId = 0,
   ) => {
     const testKey = `${record.id}-${model}`;
 
@@ -882,6 +984,10 @@ export const useChannelsData = () => {
       }
       if (stream) {
         url += `&stream=true`;
+      }
+      const baseUrlIdNum = Number(baseUrlId);
+      if (Number.isFinite(baseUrlIdNum) && baseUrlIdNum > 0) {
+        url += `&base_url_id=${baseUrlIdNum}`;
       }
       const res = await API.get(url);
 
@@ -1016,6 +1122,7 @@ export const useChannelsData = () => {
             model,
             selectedEndpointType,
             isStreamTest,
+            selectedBaseUrlId,
           ),
         );
         const batchResults = await Promise.allSettled(batchPromises);
@@ -1102,6 +1209,9 @@ export const useChannelsData = () => {
     setModelTablePage(1);
     setSelectedEndpointType('');
     setIsStreamTest(false);
+    setSelectedBaseUrlId(0);
+    setBaseUrlOptions([]);
+    setBaseUrlOptionsLoading(false);
     // 可选择性保留测试结果，这里不清空以便用户查看
   };
 
@@ -1194,6 +1304,11 @@ export const useChannelsData = () => {
     setSelectedEndpointType,
     isStreamTest,
     setIsStreamTest,
+    selectedBaseUrlId,
+    setSelectedBaseUrlId,
+    baseUrlOptions,
+    baseUrlOptionsLoading,
+    refreshChannelBaseUrlOptions,
     allSelectingRef,
 
     // Multi-key management states
@@ -1201,6 +1316,12 @@ export const useChannelsData = () => {
     setShowMultiKeyManageModal,
     currentMultiKeyChannel,
     setCurrentMultiKeyChannel,
+
+    // BaseURL management states
+    showBaseUrlManageModal,
+    setShowBaseUrlManageModal,
+    currentBaseUrlChannel,
+    setCurrentBaseUrlChannel,
     ...upstreamUpdates,
 
     // Form

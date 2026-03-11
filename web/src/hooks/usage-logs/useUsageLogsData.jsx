@@ -82,6 +82,8 @@ export const useLogsData = () => {
   const STORAGE_KEY = isAdminUser
     ? 'logs-table-columns-admin'
     : 'logs-table-columns-user';
+  const NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY =
+    'logs-table-columns-user-channel-visible-v1';
 
   // Statistics state
   const [stat, setStat] = useState({
@@ -139,11 +141,19 @@ export const useLogsData = () => {
         const defaults = getDefaultColumnVisibility();
         const merged = { ...defaults, ...parsed };
 
-        // For non-admin users, force-hide admin-only columns (does not touch admin settings)
+        // For non-admin users, force-hide sensitive columns (does not touch admin settings)
         if (!isAdminUser) {
-          merged[COLUMN_KEYS.CHANNEL] = false;
           merged[COLUMN_KEYS.USERNAME] = false;
           merged[COLUMN_KEYS.RETRY] = false;
+
+          // Historical migration: channel column used to be forcibly hidden for non-admin users.
+          // Make it visible once by default, while still allowing users to hide it afterwards.
+          const migrated =
+            localStorage.getItem(NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY) === 'true';
+          if (!migrated) {
+            merged[COLUMN_KEYS.CHANNEL] = true;
+            localStorage.setItem(NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY, 'true');
+          }
         }
         setVisibleColumns(merged);
       } catch (e) {
@@ -159,7 +169,7 @@ export const useLogsData = () => {
   const getDefaultColumnVisibility = () => {
     return {
       [COLUMN_KEYS.TIME]: true,
-      [COLUMN_KEYS.CHANNEL]: isAdminUser,
+      [COLUMN_KEYS.CHANNEL]: true,
       [COLUMN_KEYS.USERNAME]: isAdminUser,
       [COLUMN_KEYS.TOKEN]: true,
       [COLUMN_KEYS.GROUP]: true,
@@ -195,9 +205,7 @@ export const useLogsData = () => {
 
     allKeys.forEach((key) => {
       if (
-        (key === COLUMN_KEYS.CHANNEL ||
-          key === COLUMN_KEYS.USERNAME ||
-          key === COLUMN_KEYS.RETRY) &&
+        (key === COLUMN_KEYS.USERNAME || key === COLUMN_KEYS.RETRY) &&
         !isAdminUser
       ) {
         updatedColumns[key] = false;

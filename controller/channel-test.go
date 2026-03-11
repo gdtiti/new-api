@@ -56,7 +56,7 @@ func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointTyp
 	return normalized
 }
 
-func testChannel(channel *model.Channel, testModel string, endpointType string, isStream bool) testResult {
+func testChannel(channel *model.Channel, testModel string, endpointType string, isStream bool, forceBaseURLID int) testResult {
 	tik := time.Now()
 	var unsupportedTestChannelTypes = []int{
 		constant.ChannelTypeMidjourney,
@@ -154,11 +154,10 @@ func testChannel(channel *model.Channel, testModel string, endpointType string, 
 	//c.Request.Header.Set("Authorization", "Bearer "+channel.Key)
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("channel", channel.Type)
-	c.Set("base_url", channel.GetBaseURL())
 	group, _ := model.GetUserGroup(1, false)
 	c.Set("group", group)
 
-	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, testModel)
+	newAPIError := middleware.SetupContextForSelectedChannelWithForcedBaseURL(c, channel, testModel, forceBaseURLID)
 	if newAPIError != nil {
 		return testResult{
 			context:     c,
@@ -751,8 +750,9 @@ func TestChannel(c *gin.Context) {
 	testModel := c.Query("model")
 	endpointType := c.Query("endpoint_type")
 	isStream, _ := strconv.ParseBool(c.Query("stream"))
+	forceBaseURLID, _ := strconv.Atoi(c.Query("base_url_id"))
 	tik := time.Now()
-	result := testChannel(channel, testModel, endpointType, isStream)
+	result := testChannel(channel, testModel, endpointType, isStream, forceBaseURLID)
 	if result.localErr != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -814,7 +814,7 @@ func testAllChannels(notify bool) error {
 			}
 			isChannelEnabled := channel.Status == common.ChannelStatusEnabled
 			tik := time.Now()
-			result := testChannel(channel, "", "", false)
+			result := testChannel(channel, "", "", false, 0)
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
 

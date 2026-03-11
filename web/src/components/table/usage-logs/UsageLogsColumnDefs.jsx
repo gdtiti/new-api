@@ -349,12 +349,43 @@ export const getLogsColumns = ({
       title: t('渠道'),
       dataIndex: 'channel',
       render: (text, record, index) => {
+        if (
+          !(
+            record.type === 0 ||
+            record.type === 2 ||
+            record.type === 5 ||
+            record.type === 6
+          )
+        ) {
+          return <></>;
+        }
+
+        const other = getLogOther(record.other);
+        const baseUrlIndexRaw =
+          other?.base_url_index ?? other?.admin_info?.base_url_index;
+        const baseUrlIdRaw = other?.base_url_id ?? other?.admin_info?.base_url_id;
+        const baseUrlIndex =
+          baseUrlIndexRaw === undefined ||
+          baseUrlIndexRaw === null ||
+          baseUrlIndexRaw === ''
+            ? null
+            : baseUrlIndexRaw;
+        const baseUrlId =
+          baseUrlIdRaw === undefined || baseUrlIdRaw === null || baseUrlIdRaw === ''
+            ? null
+            : baseUrlIdRaw;
+
+        const channelId = record.channel ?? text;
+        const displayChannel =
+          baseUrlIndex === null ? `${channelId}` : `${channelId}-${baseUrlIndex}`;
+
         let isMultiKey = false;
         let multiKeyIndex = -1;
         let content = t('渠道') + `：${record.channel}`;
         let affinity = null;
         let showMarker = false;
-        let other = getLogOther(record.other);
+        let adminBaseUrl = null;
+
         if (other?.admin_info) {
           let adminInfo = other.admin_info;
           if (adminInfo?.is_multi_key) {
@@ -371,23 +402,42 @@ export const getLogsColumns = ({
             affinity = adminInfo.channel_affinity;
             showMarker = true;
           }
+          adminBaseUrl = adminInfo.base_url || null;
         }
 
-        return isAdminUser &&
-          (record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6) ? (
+        const baseUrlIndexText = baseUrlIndex === null ? '-' : baseUrlIndex;
+        const baseUrlIdText = baseUrlId === null ? '-' : baseUrlId;
+
+        const tooltipContent = isAdminUser ? (
+          <div style={{ lineHeight: 1.6 }}>
+            <div>{record.channel_name || t('未知渠道')}</div>
+            <div>base_url_index：{baseUrlIndexText}</div>
+            <div>base_url_id：{baseUrlIdText}</div>
+            {adminBaseUrl ? (
+              <div style={{ wordBreak: 'break-all' }}>base_url：{adminBaseUrl}</div>
+            ) : null}
+          </div>
+        ) : (
+          <div style={{ lineHeight: 1.6 }}>
+            <div>base_url_index：{baseUrlIndexText}</div>
+            <div>base_url_id：{baseUrlIdText}</div>
+          </div>
+        );
+
+        return (
           <Space>
             <span style={{ position: 'relative', display: 'inline-block' }}>
-              <Tooltip content={record.channel_name || t('未知渠道')}>
+              <Tooltip content={tooltipContent}>
                 <span>
                   <Tag
                     color={colors[parseInt(text) % colors.length]}
                     shape='circle'
                   >
-                    {text}
+                    {displayChannel}
                   </Tag>
                 </span>
               </Tooltip>
-              {showMarker && (
+              {isAdminUser && showMarker && (
                 <Tooltip
                   content={
                     <div style={{ lineHeight: 1.6 }}>
@@ -426,13 +476,13 @@ export const getLogsColumns = ({
                 </Tooltip>
               )}
             </span>
-            {isMultiKey && (
+            {isAdminUser && isMultiKey && (
               <Tag color='white' shape='circle'>
                 {multiKeyIndex}
               </Tag>
             )}
           </Space>
-        ) : null;
+        );
       },
     },
     {

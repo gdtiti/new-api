@@ -17,6 +17,9 @@ import (
 var group2model2channels map[string]map[string][]int // enabled channel
 var channelsIDM map[int]*Channel                     // all channels include disabled
 var channelSyncLock sync.RWMutex
+var channelBaseURLsIDM map[int][]*ChannelBaseURL // per-channel base_urls (sorted by sort_order asc, id asc)
+
+type ChannelFilter func(channel *Channel) bool
 
 type ChannelFilter func(channel *Channel) bool
 
@@ -29,6 +32,29 @@ func InitChannelCache() {
 	DB.Find(&channels)
 	for _, channel := range channels {
 		newChannelId2channel[channel.Id] = channel
+	}
+
+	newChannelBaseURLsIDM := make(map[int][]*ChannelBaseURL)
+	var baseURLs []*ChannelBaseURL
+	if err := DB.Find(&baseURLs).Error; err != nil {
+		common.SysError(fmt.Sprintf("failed to load channel base urls: err=%v", err))
+	} else {
+		for _, b := range baseURLs {
+			if b == nil || b.ChannelId <= 0 {
+				continue
+			}
+			newChannelBaseURLsIDM[b.ChannelId] = append(newChannelBaseURLsIDM[b.ChannelId], b)
+		}
+		for channelID := range newChannelBaseURLsIDM {
+			list := newChannelBaseURLsIDM[channelID]
+			sort.Slice(list, func(i, j int) bool {
+				if list[i].SortOrder != list[j].SortOrder {
+					return list[i].SortOrder < list[j].SortOrder
+				}
+				return list[i].Id < list[j].Id
+			})
+			newChannelBaseURLsIDM[channelID] = list
+		}
 	}
 	var abilities []*Ability
 	DB.Find(&abilities)
@@ -83,6 +109,7 @@ func InitChannelCache() {
 		}
 	}
 	channelsIDM = newChannelId2channel
+	channelBaseURLsIDM = newChannelBaseURLsIDM
 	channelSyncLock.Unlock()
 	common.SysLog("channels synced from database")
 }

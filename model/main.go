@@ -257,6 +257,7 @@ func migrateDB() error {
 
 	err := DB.AutoMigrate(
 		&Channel{},
+		&ChannelBaseURL{},
 		&Token{},
 		&User{},
 		&PasskeyCredential{},
@@ -305,6 +306,7 @@ func migrateDBFast() error {
 		name  string
 	}{
 		{&Channel{}, "Channel"},
+		{&ChannelBaseURL{}, "ChannelBaseURL"},
 		{&Token{}, "Token"},
 		{&User{}, "User"},
 		{&PasskeyCredential{}, "PasskeyCredential"},

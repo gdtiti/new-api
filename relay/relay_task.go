@@ -94,12 +94,18 @@ func ResolveOriginTask(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskErr
 		if newAPIError != nil {
 			return service.TaskErrorWrapper(newAPIError, "channel_no_available_key", newAPIError.StatusCode)
 		}
+		selectedBaseURL, newAPIError := service.SelectChannelBaseURL(c, ch, 0)
+		if newAPIError != nil {
+			return service.TaskErrorWrapper(newAPIError, "channel_no_available_base_url", newAPIError.StatusCode)
+		}
 		common.SetContextKey(c, constant.ContextKeyChannelKey, key)
 		common.SetContextKey(c, constant.ContextKeyChannelType, ch.Type)
-		common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, ch.GetBaseURL())
+		common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, selectedBaseURL.URL)
+		common.SetContextKey(c, constant.ContextKeyChannelBaseUrlId, selectedBaseURL.BaseURLID)
+		common.SetContextKey(c, constant.ContextKeyChannelBaseUrlIndex, selectedBaseURL.BaseURLIndex)
 		common.SetContextKey(c, constant.ContextKeyChannelId, originTask.ChannelId)
 
-		info.ChannelBaseUrl = ch.GetBaseURL()
+		info.ChannelBaseUrl = selectedBaseURL.URL
 		info.ChannelId = originTask.ChannelId
 		info.ChannelType = ch.Type
 		info.ApiKey = key

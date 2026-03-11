@@ -171,10 +171,16 @@ func Distribute() func(c *gin.Context) {
 			}
 		}
 		common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
-		SetupContextForSelectedChannel(c, channel, modelRequest.Model)
+		if channel != nil {
+			if setupErr := SetupContextForSelectedChannel(c, channel, modelRequest.Model); setupErr != nil {
+				abortWithOpenAiMessage(c, setupErr.StatusCode, setupErr.MaskSensitiveError(), setupErr.GetErrorCode())
+				return
+			}
+		}
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
 			service.RecordChannelAffinity(c, channel.Id)
+			service.RecordChannelBaseURLAffinity(c)
 		}
 	}
 }
@@ -358,6 +364,10 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 }
 
 func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) *types.NewAPIError {
+	return SetupContextForSelectedChannelWithForcedBaseURL(c, channel, modelName, 0)
+}
+
+func SetupContextForSelectedChannelWithForcedBaseURL(c *gin.Context, channel *model.Channel, modelName string, forceBaseURLID int) *types.NewAPIError {
 	c.Set("original_model", modelName) // for retry
 	if channel == nil {
 		return types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
@@ -395,7 +405,13 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	}
 	// c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
 	common.SetContextKey(c, constant.ContextKeyChannelKey, key)
-	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channel.GetBaseURL())
+	selectedBaseURL, newAPIError := service.SelectChannelBaseURL(c, channel, forceBaseURLID)
+	if newAPIError != nil {
+		return newAPIError
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, selectedBaseURL.URL)
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrlId, selectedBaseURL.BaseURLID)
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrlIndex, selectedBaseURL.BaseURLIndex)
 
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, false)
 
