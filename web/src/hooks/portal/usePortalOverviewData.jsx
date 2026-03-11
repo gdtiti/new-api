@@ -20,7 +20,14 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { API, renderNumber, renderQuota, showError, timestamp2string, toLocalUnixTimestamp } from '../../helpers';
+import {
+  API,
+  renderNumber,
+  renderQuota,
+  showError,
+  timestamp2string,
+  toLocalUnixTimestamp,
+} from '../../helpers';
 import { TIME_OPTIONS } from '../../constants';
 import { useDashboardCharts } from '../dashboard/useDashboardCharts';
 
@@ -33,6 +40,17 @@ const PRESET_OPTIONS = [
 const BILLING_PREFERENCE_LABELS = {
   subscription_first: '优先使用订阅额度',
   balance_first: '优先使用钱包余额',
+};
+
+const EMPTY_TREND_DATA = {
+  balance: [],
+  usedQuota: [],
+  requestCount: [],
+  times: [],
+  consumeQuota: [],
+  tokens: [],
+  rpm: [],
+  tpm: [],
 };
 
 const formatDateRange = (range) => {
@@ -53,7 +71,8 @@ const toUnixSeconds = (value) => {
 };
 
 const buildDateRangeFromPreset = (preset) => {
-  const option = PRESET_OPTIONS.find((item) => item.key === preset) || PRESET_OPTIONS[1];
+  const option =
+    PRESET_OPTIONS.find((item) => item.key === preset) || PRESET_OPTIONS[1];
   const end = Math.floor(Date.now() / 1000);
   const start = end - option.seconds;
   return [timestamp2string(start), timestamp2string(end)];
@@ -85,33 +104,39 @@ const getSubscriptionRemainDays = (subscription) => {
   return Math.ceil((end - now) / (24 * 60 * 60 * 1000));
 };
 
-const buildQuickActions = ({ navigateToWallet, navigateToSubscription, navigateToLogs, navigateToAnalytics }) => [
+const buildQuickActions = ({
+  t,
+  navigateToWallet,
+  navigateToSubscription,
+  navigateToLogs,
+  navigateToAnalytics,
+}) => [
   {
     key: 'wallet',
-    title: '查看钱包与额度',
-    description: '快速查看余额、充值入口与余额可支撑天数。',
-    actionLabel: '前往钱包',
+    title: t('查看钱包与额度'),
+    description: t('快速查看余额、充值入口与余额可支撑天数。'),
+    actionLabel: t('前往钱包'),
     onClick: navigateToWallet,
   },
   {
     key: 'subscription',
-    title: '管理当前套餐',
-    description: '查看订阅权益、已用额度与当前扣费偏好。',
-    actionLabel: '查看订阅',
+    title: t('管理当前套餐'),
+    description: t('查看订阅权益、已用额度与当前扣费偏好。'),
+    actionLabel: t('查看订阅'),
     onClick: navigateToSubscription,
   },
   {
     key: 'logs',
-    title: '追踪最近日志',
-    description: '带着当前筛选上下文跳到日志中心继续排查。',
-    actionLabel: '查看日志',
+    title: t('追踪最近日志'),
+    description: t('带着当前筛选上下文跳到日志中心继续排查。'),
+    actionLabel: t('查看日志'),
     onClick: navigateToLogs,
   },
   {
     key: 'analytics',
-    title: '深入分析趋势',
-    description: '切到分析页查看模型消耗趋势与调用占比。',
-    actionLabel: '进入分析',
+    title: t('深入分析趋势'),
+    description: t('切到分析页查看模型消耗趋势与调用占比。'),
+    actionLabel: t('进入分析'),
     onClick: navigateToAnalytics,
   },
 ];
@@ -122,6 +147,7 @@ export const usePortalOverviewData = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [user, setUser] = useState(null);
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
@@ -130,7 +156,7 @@ export const usePortalOverviewData = () => {
   const [consumeQuota, setConsumeQuota] = useState(0);
   const [times, setTimes] = useState(0);
   const [consumeTokens, setConsumeTokens] = useState(0);
-  const [trendData, setTrendData] = useState([]);
+  const [trendData, setTrendData] = useState(EMPTY_TREND_DATA);
   const [pieData, setPieData] = useState([]);
   const [lineData, setLineData] = useState([]);
   const [modelColors, setModelColors] = useState({});
@@ -160,70 +186,103 @@ export const usePortalOverviewData = () => {
     t,
   );
 
-  const syncSearchParams = useCallback((nextPreset, nextDateRange, nextDefaultTime) => {
-    const next = new URLSearchParams(searchParams);
-    next.set('preset', nextPreset);
-    next.set('default_time', nextDefaultTime);
-    next.set('start_timestamp', nextDateRange[0]);
-    next.set('end_timestamp', nextDateRange[1]);
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  const syncSearchParams = useCallback(
+    (nextPreset, nextDateRange, nextDefaultTime) => {
+      const next = new URLSearchParams(searchParams);
+      next.set('preset', nextPreset);
+      next.set('default_time', nextDefaultTime);
+      next.set('start_timestamp', nextDateRange[0]);
+      next.set('end_timestamp', nextDateRange[1]);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
-  const loadPortalData = useCallback(async (currentDateRange = dateRange, currentDefaultTime = defaultTime) => {
-    setRefreshing(true);
-    try {
-      const [userRes, subscriptionRes, plansRes, topupRes, quotaRes] = await Promise.all([
-        API.get('/api/user/self'),
-        API.get('/api/subscription/self'),
-        API.get('/api/subscription/plans'),
-        API.get('/api/user/topup/info'),
-        API.get(encodeURI(`/api/data/self?default_time=${currentDefaultTime}&start_timestamp=${toUnixSeconds(currentDateRange[0])}&end_timestamp=${toUnixSeconds(currentDateRange[1])}`)),
-      ]);
+  const loadPortalData = useCallback(
+    async (currentDateRange = dateRange, currentDefaultTime = defaultTime) => {
+      setRefreshing(true);
+      try {
+        setErrorMessage('');
+        const [userRes, subscriptionRes, plansRes, topupRes, quotaRes] =
+          await Promise.all([
+            API.get('/api/user/self'),
+            API.get('/api/subscription/self'),
+            API.get('/api/subscription/plans'),
+            API.get('/api/user/topup/info'),
+            API.get(
+              encodeURI(
+                `/api/data/self?default_time=${currentDefaultTime}&start_timestamp=${toUnixSeconds(currentDateRange[0])}&end_timestamp=${toUnixSeconds(currentDateRange[1])}`,
+              ),
+            ),
+          ]);
 
-      const responses = [userRes, subscriptionRes, plansRes, topupRes, quotaRes];
-      const failed = responses.find((response) => response?.data?.success === false);
-      if (failed) {
-        showError(failed.data?.message || t('获取客户门户数据失败'));
-        return;
+        const responses = [
+          userRes,
+          subscriptionRes,
+          plansRes,
+          topupRes,
+          quotaRes,
+        ];
+        const failed = responses.find(
+          (response) => response?.data?.success === false,
+        );
+        if (failed) {
+          const message = failed.data?.message || t('获取客户门户数据失败');
+          setErrorMessage(message);
+          showError(message);
+          return;
+        }
+
+        setUser(userRes.data?.data || null);
+        setSubscriptionInfo(subscriptionRes.data?.data || null);
+        setSubscriptionPlans(plansRes.data?.data || []);
+        setTopupInfo(topupRes.data?.data || null);
+        const nextQuotaData = quotaRes.data?.data || [];
+        setQuotaData(nextQuotaData);
+        dashboardCharts.updateChartData(nextQuotaData);
+      } catch (error) {
+        const message = error?.message || t('获取客户门户数据失败');
+        setErrorMessage(message);
+        showError(message);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      setUser(userRes.data?.data || null);
-      setSubscriptionInfo(subscriptionRes.data?.data || null);
-      setSubscriptionPlans(plansRes.data?.data || []);
-      setTopupInfo(topupRes.data?.data || null);
-      const nextQuotaData = quotaRes.data?.data || [];
-      setQuotaData(nextQuotaData);
-      dashboardCharts.updateChartData(nextQuotaData);
-    } catch (error) {
-      showError(error?.message || t('获取客户门户数据失败'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [dashboardCharts, dateRange, defaultTime, t]);
+    },
+    [dashboardCharts, dateRange, defaultTime, t],
+  );
 
   useEffect(() => {
     loadPortalData(dateRange, defaultTime).then();
   }, []);
 
-  const handlePresetChange = useCallback((nextPreset) => {
-    const nextDateRange = buildDateRangeFromPreset(nextPreset);
-    setPreset(nextPreset);
-    setDateRange(nextDateRange);
-    syncSearchParams(nextPreset, nextDateRange, defaultTime);
-  }, [defaultTime, syncSearchParams]);
+  const handlePresetChange = useCallback(
+    (nextPreset) => {
+      const nextDateRange = buildDateRangeFromPreset(nextPreset);
+      setPreset(nextPreset);
+      setDateRange(nextDateRange);
+      syncSearchParams(nextPreset, nextDateRange, defaultTime);
+    },
+    [defaultTime, syncSearchParams],
+  );
 
-  const handleDateRangeChange = useCallback((nextDateRange) => {
-    const normalized = formatDateRange(nextDateRange);
-    setPreset('custom');
-    setDateRange(normalized);
-    syncSearchParams('custom', normalized, defaultTime);
-  }, [defaultTime, syncSearchParams]);
+  const handleDateRangeChange = useCallback(
+    (nextDateRange) => {
+      const normalized = formatDateRange(nextDateRange);
+      setPreset('custom');
+      setDateRange(normalized);
+      syncSearchParams('custom', normalized, defaultTime);
+    },
+    [defaultTime, syncSearchParams],
+  );
 
-  const handleDefaultTimeChange = useCallback((value) => {
-    setDefaultTime(value);
-    syncSearchParams(preset, dateRange, value);
-  }, [dateRange, preset, syncSearchParams]);
+  const handleDefaultTimeChange = useCallback(
+    (value) => {
+      setDefaultTime(value);
+      syncSearchParams(preset, dateRange, value);
+    },
+    [dateRange, preset, syncSearchParams],
+  );
 
   const handleRefresh = useCallback(async () => {
     await loadPortalData(dateRange, defaultTime);
@@ -249,7 +308,9 @@ export const usePortalOverviewData = () => {
       return t('当前暂无订阅套餐');
     }
     const matchedPlan = planMap[subscription.plan_id];
-    return matchedPlan?.title || subscription.plan_name || t('进行中的订阅套餐');
+    return (
+      matchedPlan?.title || subscription.plan_name || t('进行中的订阅套餐')
+    );
   }, [activeSubscription, planMap, t]);
 
   const subscriptionUsagePercent = useMemo(() => {
@@ -266,15 +327,18 @@ export const usePortalOverviewData = () => {
   }, [activeSubscription]);
 
   const walletBalance = Number(user?.quota || 0);
-  const todayQuota = Number(trendData?.[trendData.length - 1]?.quota || 0);
+  const quotaTrend = Array.isArray(trendData?.consumeQuota)
+    ? trendData.consumeQuota
+    : EMPTY_TREND_DATA.consumeQuota;
+  const todayQuota = Number(quotaTrend[quotaTrend.length - 1] || 0);
   const averageDailyQuota = useMemo(() => {
-    const validItems = trendData.filter((item) => Number(item?.quota || 0) > 0);
+    const validItems = quotaTrend.filter((item) => Number(item || 0) > 0);
     if (!validItems.length) {
       return 0;
     }
-    const total = validItems.reduce((sum, item) => sum + Number(item?.quota || 0), 0);
+    const total = validItems.reduce((sum, item) => sum + Number(item || 0), 0);
     return total / validItems.length;
-  }, [trendData]);
+  }, [quotaTrend]);
 
   const balanceCoverageDays = useMemo(() => {
     if (!walletBalance || !averageDailyQuota) {
@@ -284,7 +348,9 @@ export const usePortalOverviewData = () => {
   }, [averageDailyQuota, walletBalance]);
 
   const quotaRanking = useMemo(() => {
-    return [...pieData].sort((a, b) => Number(b.value || 0) - Number(a.value || 0)).slice(0, 5);
+    return [...pieData]
+      .sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
+      .slice(0, 5);
   }, [pieData]);
 
   const requestRanking = useMemo(() => {
@@ -295,29 +361,36 @@ export const usePortalOverviewData = () => {
 
   const topQuotaModel = quotaRanking[0]?.type || '';
   const topRequestModel = requestRanking[0]?.Model || '';
-  const billingPreferenceLabel = t(BILLING_PREFERENCE_LABELS[subscriptionInfo?.billing_preference || 'subscription_first'] || '优先使用订阅额度');
+  const billingPreferenceLabel = t(
+    BILLING_PREFERENCE_LABELS[
+      subscriptionInfo?.billing_preference || 'subscription_first'
+    ] || '优先使用订阅额度',
+  );
 
-  const buildLogPath = useCallback((extra = {}) => {
-    const next = new URLSearchParams();
-    next.set('start_timestamp', dateRange[0]);
-    next.set('end_timestamp', dateRange[1]);
-    if (extra.model_name) {
-      next.set('model_name', extra.model_name);
-    }
-    if (extra.token_name) {
-      next.set('token_name', extra.token_name);
-    }
-    if (extra.group) {
-      next.set('group', extra.group);
-    }
-    if (extra.request_id) {
-      next.set('request_id', extra.request_id);
-    }
-    if (extra.logType !== undefined && extra.logType !== null) {
-      next.set('logType', `${extra.logType}`);
-    }
-    return `/app/logs?${next.toString()}`;
-  }, [dateRange]);
+  const buildLogPath = useCallback(
+    (extra = {}) => {
+      const next = new URLSearchParams();
+      next.set('start_timestamp', dateRange[0]);
+      next.set('end_timestamp', dateRange[1]);
+      if (extra.model_name) {
+        next.set('model_name', extra.model_name);
+      }
+      if (extra.token_name) {
+        next.set('token_name', extra.token_name);
+      }
+      if (extra.group) {
+        next.set('group', extra.group);
+      }
+      if (extra.request_id) {
+        next.set('request_id', extra.request_id);
+      }
+      if (extra.logType !== undefined && extra.logType !== null) {
+        next.set('logType', `${extra.logType}`);
+      }
+      return `/app/logs?${next.toString()}`;
+    },
+    [dateRange],
+  );
 
   const buildModelPath = useCallback((modelName) => {
     const next = new URLSearchParams();
@@ -328,11 +401,29 @@ export const usePortalOverviewData = () => {
     return `/app/models${next.toString() ? `?${next.toString()}` : ''}`;
   }, []);
 
-  const navigateToWallet = useCallback(() => navigate('/app/wallet'), [navigate]);
-  const navigateToSubscription = useCallback(() => navigate('/app/subscription'), [navigate]);
-  const navigateToAnalytics = useCallback(() => navigate(`/app/analytics?${new URLSearchParams({ preset, default_time: defaultTime, start_timestamp: dateRange[0], end_timestamp: dateRange[1] }).toString()}`), [navigate, preset, defaultTime, dateRange]);
-  const navigateToLogs = useCallback((extra) => navigate(buildLogPath(extra)), [buildLogPath, navigate]);
-  const navigateToModel = useCallback((modelName) => navigate(buildModelPath(modelName)), [buildModelPath, navigate]);
+  const navigateToWallet = useCallback(
+    () => navigate('/app/wallet'),
+    [navigate],
+  );
+  const navigateToSubscription = useCallback(
+    () => navigate('/app/subscription'),
+    [navigate],
+  );
+  const navigateToAnalytics = useCallback(
+    () =>
+      navigate(
+        `/app/analytics?${new URLSearchParams({ preset, default_time: defaultTime, start_timestamp: dateRange[0], end_timestamp: dateRange[1] }).toString()}`,
+      ),
+    [navigate, preset, defaultTime, dateRange],
+  );
+  const navigateToLogs = useCallback(
+    (extra) => navigate(buildLogPath(extra)),
+    [buildLogPath, navigate],
+  );
+  const navigateToModel = useCallback(
+    (modelName) => navigate(buildModelPath(modelName)),
+    [buildModelPath, navigate],
+  );
 
   const insights = useMemo(() => {
     const items = [];
@@ -342,7 +433,10 @@ export const usePortalOverviewData = () => {
         key: 'balance-alert',
         level: 'warning',
         title: t('余额可支撑时间偏短'),
-        description: t('按当前平均消耗速度，钱包余额预计还能支撑 {{days}} 天。', { days: balanceCoverageDays }),
+        description: t(
+          '按当前平均消耗速度，钱包余额预计还能支撑 {{days}} 天。',
+          { days: balanceCoverageDays },
+        ),
         actionLabel: t('前往钱包'),
         onClick: navigateToWallet,
       });
@@ -353,7 +447,10 @@ export const usePortalOverviewData = () => {
         key: 'subscription-expire',
         level: 'critical',
         title: t('订阅即将到期'),
-        description: t('当前套餐预计 {{days}} 天后到期，建议提前续费或调整扣费偏好。', { days: subscriptionRemainDays }),
+        description: t(
+          '当前套餐预计 {{days}} 天后到期，建议提前续费或调整扣费偏好。',
+          { days: subscriptionRemainDays },
+        ),
         actionLabel: t('查看订阅'),
         onClick: navigateToSubscription,
       });
@@ -364,7 +461,10 @@ export const usePortalOverviewData = () => {
         key: 'top-quota-model',
         level: 'info',
         title: t('高消耗模型需要重点关注'),
-        description: t('{{model}} 是当前时间范围内消耗最高的模型，可查看日志进一步定位。', { model: topQuotaModel }),
+        description: t(
+          '{{model}} 是当前时间范围内消耗最高的模型，可查看日志进一步定位。',
+          { model: topQuotaModel },
+        ),
         actionLabel: t('查看日志'),
         onClick: () => navigateToLogs({ model_name: topQuotaModel }),
       });
@@ -375,65 +475,114 @@ export const usePortalOverviewData = () => {
         key: 'top-request-model',
         level: 'success',
         title: t('高频模型值得做对比分析'),
-        description: t('{{model}} 当前调用最频繁，可跳转模型广场查看替代选项。', { model: topRequestModel }),
+        description: t(
+          '{{model}} 当前调用最频繁，可跳转模型广场查看替代选项。',
+          { model: topRequestModel },
+        ),
         actionLabel: t('查看模型'),
         onClick: () => navigateToModel(topRequestModel),
       });
     }
 
     return items.slice(0, 4);
-  }, [balanceCoverageDays, navigateToLogs, navigateToModel, navigateToSubscription, navigateToWallet, subscriptionRemainDays, t, topQuotaModel, topRequestModel]);
+  }, [
+    balanceCoverageDays,
+    navigateToLogs,
+    navigateToModel,
+    navigateToSubscription,
+    navigateToWallet,
+    subscriptionRemainDays,
+    t,
+    topQuotaModel,
+    topRequestModel,
+  ]);
 
-  const overviewMetricCards = useMemo(() => [
-    {
-      key: 'wallet',
-      label: t('钱包余额'),
-      value: renderQuota(walletBalance, 2),
-      hint: balanceCoverageDays !== null ? t('按当前速度预计可支撑 {{days}} 天', { days: balanceCoverageDays }) : t('暂无可用消耗预测'),
-    },
-    {
-      key: 'subscription',
-      label: t('套餐已用'),
-      value: `${subscriptionUsagePercent}%`,
-      hint: t('当前套餐：{{plan}}', { plan: subscriptionTitle }),
-    },
-    {
-      key: 'quota',
-      label: t('时间范围总消耗'),
-      value: renderQuota(consumeQuota, 2),
-      hint: t('今日消耗 {{quota}}', { quota: renderQuota(todayQuota, 2) }),
-    },
-    {
-      key: 'requests',
-      label: t('总调用次数'),
-      value: renderNumber(times),
-      hint: t('累计消耗 Tokens {{tokens}}', { tokens: renderNumber(consumeTokens) }),
-    },
-  ], [balanceCoverageDays, consumeQuota, consumeTokens, subscriptionTitle, subscriptionUsagePercent, t, times, todayQuota, walletBalance]);
+  const overviewMetricCards = useMemo(
+    () => [
+      {
+        key: 'wallet',
+        label: t('钱包余额'),
+        value: renderQuota(walletBalance, 2),
+        hint:
+          balanceCoverageDays !== null
+            ? t('按当前速度预计可支撑 {{days}} 天', {
+                days: balanceCoverageDays,
+              })
+            : t('暂无可用消耗预测'),
+      },
+      {
+        key: 'subscription',
+        label: t('套餐已用'),
+        value: `${subscriptionUsagePercent}%`,
+        hint: t('当前套餐：{{plan}}', { plan: subscriptionTitle }),
+      },
+      {
+        key: 'quota',
+        label: t('时间范围总消耗'),
+        value: renderQuota(consumeQuota, 2),
+        hint: t('今日消耗 {{quota}}', { quota: renderQuota(todayQuota, 2) }),
+      },
+      {
+        key: 'requests',
+        label: t('总调用次数'),
+        value: renderNumber(times),
+        hint: t('累计消耗 Tokens {{tokens}}', {
+          tokens: renderNumber(consumeTokens),
+        }),
+      },
+    ],
+    [
+      balanceCoverageDays,
+      consumeQuota,
+      consumeTokens,
+      subscriptionTitle,
+      subscriptionUsagePercent,
+      t,
+      times,
+      todayQuota,
+      walletBalance,
+    ],
+  );
 
-  const analyticsMetricCards = useMemo(() => [
-    ...overviewMetricCards,
-    {
-      key: 'avg-daily',
-      label: t('日均消耗'),
-      value: renderQuota(averageDailyQuota, 2),
-      hint: t('按当前筛选窗口计算'),
-    },
-    {
-      key: 'billing-preference',
-      label: t('当前扣费偏好'),
-      value: billingPreferenceLabel,
-      hint: t('可在钱包或订阅中心调整'),
-    },
-  ], [averageDailyQuota, billingPreferenceLabel, overviewMetricCards, t]);
+  const analyticsMetricCards = useMemo(
+    () => [
+      ...overviewMetricCards,
+      {
+        key: 'avg-daily',
+        label: t('日均消耗'),
+        value: renderQuota(averageDailyQuota, 2),
+        hint: t('按当前筛选窗口计算'),
+      },
+      {
+        key: 'billing-preference',
+        label: t('当前扣费偏好'),
+        value: billingPreferenceLabel,
+        hint: t('可在钱包或订阅中心调整'),
+      },
+    ],
+    [averageDailyQuota, billingPreferenceLabel, overviewMetricCards, t],
+  );
 
   const quickActions = useMemo(() => {
-    return buildQuickActions({ navigateToWallet, navigateToSubscription, navigateToLogs: () => navigateToLogs(), navigateToAnalytics });
-  }, [navigateToAnalytics, navigateToLogs, navigateToSubscription, navigateToWallet]);
+    return buildQuickActions({
+      t,
+      navigateToWallet,
+      navigateToSubscription,
+      navigateToLogs: () => navigateToLogs(),
+      navigateToAnalytics,
+    });
+  }, [
+    navigateToAnalytics,
+    navigateToLogs,
+    navigateToSubscription,
+    navigateToWallet,
+    t,
+  ]);
 
   return {
     loading,
     refreshing,
+    errorMessage,
     preset,
     setPreset,
     dateRange,
