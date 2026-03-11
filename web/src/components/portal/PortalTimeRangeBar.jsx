@@ -17,8 +17,56 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
+import { useMemo } from 'react';
 import { Button, DatePicker, Select } from '@douyinfe/semi-ui';
 import { IconRefresh } from '@douyinfe/semi-icons';
+import { useTranslation } from 'react-i18next';
+import { timestamp2string, toLocalUnixMilliseconds } from '../../helpers';
+
+const normalizeDatePickerValue = (dateRange) => {
+  if (!Array.isArray(dateRange) || dateRange.length !== 2) {
+    return [];
+  }
+
+  const nextValue = dateRange
+    .map((item) => {
+      if (item instanceof Date && !Number.isNaN(item.getTime())) {
+        return item;
+      }
+
+      const milliseconds = toLocalUnixMilliseconds(item);
+      if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+        return null;
+      }
+
+      const nextDate = new Date(milliseconds);
+      return Number.isNaN(nextDate.getTime()) ? null : nextDate;
+    })
+    .filter(Boolean);
+
+  return nextValue.length === 2 ? nextValue : [];
+};
+
+const normalizeChangeResult = (value, valueString) => {
+  if (
+    Array.isArray(valueString) &&
+    valueString.length === 2 &&
+    valueString.every(Boolean)
+  ) {
+    return valueString;
+  }
+
+  if (!Array.isArray(value) || value.length !== 2) {
+    return value;
+  }
+
+  return value.map((item) => {
+    if (item instanceof Date && !Number.isNaN(item.getTime())) {
+      return timestamp2string(Math.floor(item.getTime() / 1000));
+    }
+    return item;
+  });
+};
 
 const PortalTimeRangeBar = ({
   preset,
@@ -32,6 +80,12 @@ const PortalTimeRangeBar = ({
   onDefaultTimeChange,
   onRefresh,
 }) => {
+  const { t } = useTranslation();
+  const pickerValue = useMemo(
+    () => normalizeDatePickerValue(dateRange),
+    [dateRange],
+  );
+
   return (
     <div className='portal-panel portal-range-bar'>
       <div className='portal-range-bar__presets'>
@@ -49,23 +103,19 @@ const PortalTimeRangeBar = ({
       <div className='portal-range-bar__controls'>
         <DatePicker
           type='dateTimeRange'
-          value={dateRange}
+          value={pickerValue}
           onChange={(value, valueString) =>
-            onDateRangeChange(
-              Array.isArray(valueString) && valueString.length === 2
-                ? valueString
-                : value,
-            )
+            onDateRangeChange(normalizeChangeResult(value, valueString))
           }
           density='default'
-          insetLabel='时间范围'
+          insetLabel={t('时间范围')}
         />
         <Select
           className='portal-range-bar__granularity'
           value={defaultTime}
           optionList={timeOptions}
           onChange={onDefaultTimeChange}
-          insetLabel='粒度'
+          insetLabel={t('粒度')}
         />
         <Button
           icon={<IconRefresh />}
@@ -73,7 +123,7 @@ const PortalTimeRangeBar = ({
           onClick={onRefresh}
           type='primary'
         >
-          刷新数据
+          {t('刷新数据')}
         </Button>
       </div>
     </div>

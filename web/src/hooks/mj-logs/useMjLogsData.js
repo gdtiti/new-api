@@ -17,8 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@douyinfe/semi-ui';
 import {
   API,
@@ -34,6 +35,8 @@ import { useTableCompactMode } from '../common/useTableCompactMode';
 
 export const useMjLogsData = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const appliedSearchRef = useRef('');
 
   // Define column keys for selection
   const COLUMN_KEYS = {
@@ -75,14 +78,20 @@ export const useMjLogsData = () => {
   // Form state
   const [formApi, setFormApi] = useState(null);
   let now = new Date();
-  const formInitValues = {
-    channel_id: '',
-    mj_id: '',
-    dateRange: [
-      timestamp2string(now.getTime() / 1000 - 2592000),
-      timestamp2string(now.getTime() / 1000 + 3600),
-    ],
-  };
+  const formInitValues = useMemo(() => {
+    const startTimestamp =
+      searchParams.get('start_timestamp') ||
+      timestamp2string(now.getTime() / 1000 - 2592000);
+    const endTimestamp =
+      searchParams.get('end_timestamp') ||
+      timestamp2string(now.getTime() / 1000 + 3600);
+
+    return {
+      channel_id: searchParams.get('channel_id') || '',
+      mj_id: searchParams.get('mj_id') || '',
+      dateRange: [startTimestamp, endTimestamp],
+    };
+  }, [searchParams, now]);
 
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState({});
@@ -284,6 +293,28 @@ export const useMjLogsData = () => {
     setPageSize(localPageSize);
     loadLogs(1, localPageSize).then();
   }, []);
+
+  useEffect(() => {
+    if (!formApi) {
+      return;
+    }
+
+    const syncParams = new URLSearchParams(searchParams);
+    syncParams.delete('tab');
+    const currentSearchKey = syncParams.toString();
+    if (appliedSearchRef.current === currentSearchKey) {
+      return;
+    }
+
+    formApi.setValues(formInitValues);
+    appliedSearchRef.current = currentSearchKey;
+
+    if (currentSearchKey) {
+      setTimeout(() => {
+        refresh().then();
+      }, 0);
+    }
+  }, [formApi, formInitValues, refresh, searchParams]);
 
   return {
     // Basic state

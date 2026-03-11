@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect, useContext, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { API, copy, showError, showInfo, showSuccess } from '../../helpers';
 import { Modal } from '@douyinfe/semi-ui';
 import { UserContext } from '../../context/User';
@@ -28,6 +28,7 @@ import { StatusContext } from '../../context/Status';
 export const useModelPricingData = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const compositionRef = useRef({ isComposition: false });
   const openedFromQueryRef = useRef('');
@@ -311,6 +312,15 @@ export const useModelPricingData = () => {
     }, 300);
   };
 
+  const navigateToModelLogs = (modelName) => {
+    const next = new URLSearchParams();
+    next.set('tab', 'api');
+    if (modelName) {
+      next.set('model_name', modelName);
+    }
+    navigate(`/app/logs?${next.toString()}`);
+  };
+
   useEffect(() => {
     refresh().then();
   }, []);
@@ -430,6 +440,7 @@ export const useModelPricingData = () => {
     handleGroupClick,
     openModelDetail,
     closeModelDetail,
+    navigateToModelLogs,
 
     // 引用
     compositionRef,

@@ -25,7 +25,7 @@ import ModelDetailSideSheet from '../modal/ModelDetailSideSheet';
 import { useModelPricingData } from '../../../../hooks/model-pricing/useModelPricingData';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 
-const PricingPage = () => {
+const PricingPage = ({ portalMode = false }) => {
   const pricingData = useModelPricingData();
   const { Sider, Content } = Layout;
   const isMobile = useIsMobile();
@@ -40,7 +40,9 @@ const PricingPage = () => {
   };
 
   return (
-    <div className='bg-white'>
+    <div
+      className={`pricing-page ${portalMode ? 'pricing-page--portal' : 'pricing-page--default bg-white'}`}
+    >
       <Layout className='pricing-layout'>
         {!isMobile && (
           <Sider className='pricing-scroll-hide pricing-sidebar'>
@@ -67,6 +69,7 @@ const PricingPage = () => {
         visible={pricingData.showModelDetail}
         onClose={pricingData.closeModelDetail}
         modelData={pricingData.selectedModel}
+        onViewLogs={pricingData.navigateToModelLogs}
         groupRatio={pricingData.groupRatio}
         usableGroup={pricingData.usableGroup}
         currency={pricingData.currency}

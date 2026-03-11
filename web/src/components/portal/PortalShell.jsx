@@ -17,7 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Avatar, Button, Tag, Typography } from '@douyinfe/semi-ui';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -193,6 +199,38 @@ const PortalShell = () => {
     status.passkey_login,
     t,
   ]);
+
+  const heroStats = useMemo(
+    () => [
+      {
+        key: 'module',
+        label: t('当前模块'),
+        value: currentItem?.title || t('总览'),
+        hint: currentItem?.description || t('统一查看客户侧经营与账户信息'),
+      },
+      {
+        key: 'coverage',
+        label: t('覆盖能力'),
+        value: `${navItems.length}`,
+        hint: t('总览、账单、日志、模型与账户能力已纳入统一门户'),
+      },
+      {
+        key: 'status',
+        label: t('接入状态'),
+        value: statusTags.length ? t('多能力已启用') : t('基础能力可用'),
+        hint: statusTags.length
+          ? t('认证、支付与第三方入口会按系统配置动态展示')
+          : t('登录与基础客户能力已就绪，可继续按模块深入使用'),
+      },
+    ],
+    [
+      currentItem?.description,
+      currentItem?.title,
+      navItems.length,
+      statusTags.length,
+      t,
+    ],
+  );
 
   const goTo = useCallback(
     (to) => {
@@ -381,7 +419,9 @@ const PortalShell = () => {
                   .toUpperCase()}
               </Avatar>
               <div className='portal-shell__user-copy'>
-                <Text strong>{user?.display_name || user?.username || 'User'}</Text>
+                <Text strong>
+                  {user?.display_name || user?.username || 'User'}
+                </Text>
                 <Text type='secondary' size='small'>
                   {isAdmin ? t('管理员账户') : t('客户账户')}
                 </Text>
@@ -401,15 +441,27 @@ const PortalShell = () => {
 
         <section className='portal-shell__hero'>
           <div>
-            <Text className='portal-shell__eyebrow'>{t('第一阶段')}</Text>
+            <Text className='portal-shell__eyebrow'>{t('统一客户门户')}</Text>
             <Title heading={4} className='!mb-1'>
-              {t('客户门户骨架已接入')}
+              {t('在 {{module}} 中保持一致的客户体验', {
+                module: currentItem?.title || t('总览'),
+              })}
             </Title>
             <Text type='secondary'>
               {t(
-                '当前阶段先完成独立门户路由、导航分层与统一认证回跳，后续阶段再逐页深化数据视图。',
+                '围绕余额、订阅、日志与模型分析建立统一的信息架构、视觉风格和操作路径，减少页面跳转与信息割裂。',
               )}
             </Text>
+
+            <div className='portal-shell__hero-grid'>
+              {heroStats.map((item) => (
+                <div className='portal-shell__hero-stat' key={item.key}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <small>{item.hint}</small>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className='portal-shell__tags'>

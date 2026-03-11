@@ -68,7 +68,16 @@ const PortalOverviewPage = lazy(
 const PortalAnalyticsPage = lazy(
   () => import('./components/portal/PortalAnalyticsPage'),
 );
-const PortalUsageLogs = lazy(() => import('./components/table/usage-logs'));
+const PortalWalletPage = lazy(
+  () => import('./components/portal/PortalWalletPage'),
+);
+const PortalSubscriptionPage = lazy(
+  () => import('./components/portal/PortalSubscriptionPage'),
+);
+const PortalLogsPage = lazy(() => import('./components/portal/PortalLogsPage'));
+const PortalModelGalleryPage = lazy(
+  () => import('./components/portal/PortalModelGalleryPage'),
+);
 
 function DynamicOAuth2Callback() {
   const { provider } = useParams();
@@ -312,7 +321,7 @@ function App() {
             path='wallet'
             element={
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <TopUp />
+                <PortalWalletPage />
               </Suspense>
             }
           />
@@ -320,7 +329,7 @@ function App() {
             path='subscription'
             element={
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <TopUp />
+                <PortalSubscriptionPage />
               </Suspense>
             }
           />
@@ -328,7 +337,7 @@ function App() {
             path='logs'
             element={
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <PortalUsageLogs />
+                <PortalLogsPage />
               </Suspense>
             }
           />
@@ -336,7 +345,7 @@ function App() {
             path='models'
             element={
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <Pricing />
+                <PortalModelGalleryPage />
               </Suspense>
             }
           />
