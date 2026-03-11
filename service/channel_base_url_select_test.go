@@ -206,7 +206,7 @@ func TestSelectChannelBaseURL_ForcedByID_AllowsDisabledAndReturnsIndex(t *testin
 	require.False(t, got.UsedAffinity)
 }
 
-func TestSelectChannelBaseURL_AllEnabledRowsParticipateAcrossSortOrders(t *testing.T) {
+func TestSelectChannelBaseURL_TierSelectsOnlyMinSortOrderTier(t *testing.T) {
 	ensureChannelBaseURLSchema(t)
 	truncateChannelBaseURLTables(t)
 	disableMemoryCacheForTest(t)
@@ -239,15 +239,12 @@ func TestSelectChannelBaseURL_AllEnabledRowsParticipateAcrossSortOrders(t *testi
 	})
 
 	rand.Seed(7)
-	counts := map[int]int{}
-	for i := 0; i < 400; i++ {
+	for i := 0; i < 200; i++ {
 		got, apiErr := SelectChannelBaseURL(nil, ch, 0)
 		require.Nil(t, apiErr)
-		counts[got.BaseURLID]++
+		require.NotEqual(t, 3, got.BaseURLID)
+		require.NotEqual(t, "https://tier5.example", got.URL)
 	}
-	require.Greater(t, counts[3], 0, "higher sort_order row should still participate in load balancing")
-	require.Greater(t, counts[3], counts[1], "weight should dominate over sort_order")
-	require.Greater(t, counts[3], counts[2], "weight should dominate over sort_order")
 }
 
 func TestSelectChannelBaseURL_WeightedDistribution_ZeroWeightActsAsOne(t *testing.T) {
@@ -290,7 +287,7 @@ func TestSelectChannelBaseURL_WeightedDistribution_ZeroWeightActsAsOne(t *testin
 	require.Equal(t, draws, counts[11]+counts[22])
 }
 
-func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDAcrossAllCandidates(t *testing.T) {
+func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDInTier(t *testing.T) {
 	ensureChannelBaseURLSchema(t)
 	truncateChannelBaseURLTables(t)
 	disableMemoryCacheForTest(t)
@@ -311,7 +308,7 @@ func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDAcrossAllCandidate
 		Url:       "https://aff-b.example",
 		Enabled:   true,
 		Weight:    1,
-		SortOrder: 9,
+		SortOrder: 0,
 	})
 
 	cacheKey := fmt.Sprintf("test:aff:%s", strings.ReplaceAll(t.Name(), "/", "_"))
@@ -352,7 +349,7 @@ func TestSelectChannelBaseURL_GenericAffinityByUserContext_IsStableAndDistribute
 		Url:       "https://user-aff-2.example",
 		Enabled:   true,
 		Weight:    1,
-		SortOrder: 5,
+		SortOrder: 0,
 	})
 	seedChannelBaseURL(t, &model.ChannelBaseURL{
 		Id:        103,
@@ -360,7 +357,7 @@ func TestSelectChannelBaseURL_GenericAffinityByUserContext_IsStableAndDistribute
 		Url:       "https://user-aff-3.example",
 		Enabled:   true,
 		Weight:    1,
-		SortOrder: 10,
+		SortOrder: 0,
 	})
 
 	ctx1 := buildGinJSONContext(t, "/v1/chat/completions", `{}`)
@@ -385,7 +382,7 @@ func TestSelectChannelBaseURL_GenericAffinityByUserContext_IsStableAndDistribute
 		require.True(t, got.UsedAffinity)
 		selectedByUsers[got.BaseURLID] = struct{}{}
 	}
-	require.GreaterOrEqual(t, len(selectedByUsers), 2, "different users should be distributed across multiple base_url rows")
+	require.GreaterOrEqual(t, len(selectedByUsers), 2, "different users should be distributed across multiple base_url rows in the same tier")
 }
 
 func TestSelectChannelBaseURL_GenericAffinityByRequestBodyUserField(t *testing.T) {

@@ -282,6 +282,24 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 		)
 	}
 
+	// Locked semantics from the original feature task:
+	// choose the smallest sort_order tier first, then only load-balance inside that tier.
+	minSortOrder := candidates[0].baseURL.SortOrder
+	for _, cand := range candidates {
+		if cand.baseURL.SortOrder < minSortOrder {
+			minSortOrder = cand.baseURL.SortOrder
+		}
+	}
+	tier := make([]baseURLCandidate, 0, len(candidates))
+	for _, cand := range candidates {
+		if cand.baseURL.SortOrder == minSortOrder {
+			tier = append(tier, cand)
+		}
+	}
+	if len(tier) == 0 {
+		tier = candidates
+	}
+
 	// URL-level affinity: prefer an existing stable base_url mapping under the same affinity key.
 	// Key dimension: channel affinity key (or fallback user key) + channel_id.
 	if affinityKey, ok := buildChannelBaseURLAffinityKey(c, channel.Id); ok {
@@ -292,7 +310,7 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 		if cacheErr != nil {
 			common.SysError(fmt.Sprintf("channel base_url affinity cache get failed: key=%s, err=%v", affinityKey.cacheKeyFull, cacheErr))
 		} else if found && cachedID > 0 {
-			for _, cand := range candidates {
+			for _, cand := range tier {
 				if cand.baseURL != nil && cand.baseURL.Id == cachedID {
 					return SelectedChannelBaseURL{
 						URL:          strings.TrimSpace(cand.baseURL.Url),
@@ -305,7 +323,7 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 			}
 		}
 
-		if selected, ok := selectWeightedBaseURLCandidateByStableKey(candidates, affinityKey.stableKey); ok {
+		if selected, ok := selectWeightedBaseURLCandidateByStableKey(tier, affinityKey.stableKey); ok {
 			return SelectedChannelBaseURL{
 				URL:          strings.TrimSpace(selected.baseURL.Url),
 				BaseURLID:    selected.baseURL.Id,
@@ -316,8 +334,8 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 		}
 	}
 
-	// Weighted load balance across all enabled rows.
-	selected, ok := selectWeightedBaseURLCandidate(candidates)
+	// Weighted load balance only within the chosen tier.
+	selected, ok := selectWeightedBaseURLCandidate(tier)
 	if !ok {
 		return SelectedChannelBaseURL{}, types.NewErrorWithStatusCode(
 			fmt.Errorf("渠道 %d base_url 选择失败（候选为空）", channel.Id),
