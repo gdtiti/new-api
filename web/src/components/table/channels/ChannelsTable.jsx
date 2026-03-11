@@ -61,6 +61,9 @@ const ChannelsTable = (channelsData) => {
     // Multi-key management
     setShowMultiKeyManageModal,
     setCurrentMultiKeyChannel,
+    // BaseURL management
+    setShowBaseUrlManageModal,
+    setCurrentBaseUrlChannel,
     openUpstreamUpdateModal,
     detectChannelUpstreamUpdates,
   } = channelsData;
@@ -88,6 +91,8 @@ const ChannelsTable = (channelsData) => {
       checkOllamaVersion,
       setShowMultiKeyManageModal,
       setCurrentMultiKeyChannel,
+      setShowBaseUrlManageModal,
+      setCurrentBaseUrlChannel,
       openUpstreamUpdateModal,
       detectChannelUpstreamUpdates,
     });
@@ -112,6 +117,8 @@ const ChannelsTable = (channelsData) => {
     checkOllamaVersion,
     setShowMultiKeyManageModal,
     setCurrentMultiKeyChannel,
+    setShowBaseUrlManageModal,
+    setCurrentBaseUrlChannel,
     openUpstreamUpdateModal,
     detectChannelUpstreamUpdates,
   ]);

@@ -385,8 +385,17 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		other["channel_id"] = channelId
 		other["channel_name"] = c.GetString("channel_name")
 		other["channel_type"] = c.GetInt("channel_type")
+		if baseURLID := common.GetContextKeyInt(c, constant.ContextKeyChannelBaseUrlId); baseURLID > 0 {
+			other["base_url_id"] = baseURLID
+		}
+		if baseURLIndex := common.GetContextKeyInt(c, constant.ContextKeyChannelBaseUrlIndex); baseURLIndex > 0 {
+			other["base_url_index"] = baseURLIndex
+		}
 		adminInfo := make(map[string]interface{})
 		adminInfo["use_channel"] = c.GetStringSlice("use_channel")
+		if baseURL := service.SanitizeBaseURLForAdminInfo(common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl)); baseURL != "" {
+			adminInfo["base_url"] = baseURL
+		}
 		isMultiKey := common.GetContextKeyBool(c, constant.ContextKeyChannelIsMultiKey)
 		if isMultiKey {
 			adminInfo["is_multi_key"] = true
