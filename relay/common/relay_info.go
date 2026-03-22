@@ -168,6 +168,8 @@ type RelayInfo struct {
 	*ResponsesUsageInfo
 	*ChannelMeta
 	*TaskRelayInfo
+
+	ResponsesWSCreateEvent map[string]any
 }
 
 func (info *RelayInfo) InitChannelMeta(c *gin.Context) {
