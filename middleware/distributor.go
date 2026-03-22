@@ -27,6 +27,19 @@ type ModelRequest struct {
 	Group string `json:"group,omitempty"`
 }
 
+func isWebSocketResponsesRequest(c *gin.Context) bool {
+	if c == nil || c.Request == nil {
+		return false
+	}
+	if c.Request.Method != http.MethodGet {
+		return false
+	}
+	if !strings.HasPrefix(c.Request.URL.Path, "/v1/responses") {
+		return false
+	}
+	return strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
+}
+
 func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		var channel *model.Channel
@@ -203,6 +216,9 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	var modelRequest ModelRequest
 	shouldSelectChannel := true
 	var err error
+	if isWebSocketResponsesRequest(c) {
+		return &modelRequest, false, nil
+	}
 	if strings.Contains(c.Request.URL.Path, "/mj/") {
 		relayMode := relayconstant.Path2RelayModeMidjourney(c.Request.URL.Path)
 		if relayMode == relayconstant.RelayModeMidjourneyTaskFetch ||
