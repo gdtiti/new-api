@@ -34,7 +34,9 @@ func InitChannelCache() {
 
 	newChannelBaseURLsIDM := make(map[int][]*ChannelBaseURL)
 	var baseURLs []*ChannelBaseURL
-	if err := DB.Find(&baseURLs).Error; err != nil {
+	if err := EnsureChannelBaseURLSchema(); err != nil {
+		common.SysError(fmt.Sprintf("failed to ensure channel base url schema: err=%v", err))
+	} else if err := DB.Find(&baseURLs).Error; err != nil {
 		common.SysError(fmt.Sprintf("failed to load channel base urls: err=%v", err))
 	} else {
 		for _, b := range baseURLs {

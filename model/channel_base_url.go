@@ -1,7 +1,9 @@
 package model
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"gorm.io/gorm"
@@ -25,6 +27,11 @@ type ChannelBaseURL struct {
 	SortOrder int  `json:"sort_order" gorm:"index;default:0"`
 }
 
+var (
+	channelBaseURLSchemaEnsureLock sync.Mutex
+	channelBaseURLSchemaEnsuredDB  *gorm.DB
+)
+
 func (b *ChannelBaseURL) BeforeCreate(tx *gorm.DB) error {
 	now := common.GetTimestamp()
 	if b.CreatedAt == 0 {
@@ -43,9 +50,38 @@ func (b *ChannelBaseURL) BeforeUpdate(tx *gorm.DB) error {
 	return nil
 }
 
+func EnsureChannelBaseURLSchema() error {
+	if DB == nil {
+		return fmt.Errorf("database is not initialized")
+	}
+	if channelBaseURLSchemaEnsuredDB == DB {
+		return nil
+	}
+
+	channelBaseURLSchemaEnsureLock.Lock()
+	defer channelBaseURLSchemaEnsureLock.Unlock()
+
+	if channelBaseURLSchemaEnsuredDB == DB {
+		return nil
+	}
+	if DB.Migrator().HasTable(&ChannelBaseURL{}) {
+		channelBaseURLSchemaEnsuredDB = DB
+		return nil
+	}
+	if err := DB.AutoMigrate(&ChannelBaseURL{}); err != nil {
+		return err
+	}
+	channelBaseURLSchemaEnsuredDB = DB
+	common.SysLog("channel_base_urls table was missing and has been auto-created")
+	return nil
+}
+
 func GetChannelBaseURLByID(id int) (*ChannelBaseURL, bool, error) {
 	if id <= 0 {
 		return nil, false, nil
+	}
+	if err := EnsureChannelBaseURLSchema(); err != nil {
+		return nil, false, err
 	}
 	var baseURL ChannelBaseURL
 	err := DB.Where("id = ?", id).First(&baseURL).Error
@@ -62,6 +98,9 @@ func GetChannelBaseURLs(channelID int) ([]*ChannelBaseURL, error) {
 	if channelID <= 0 {
 		return nil, nil
 	}
+	if err := EnsureChannelBaseURLSchema(); err != nil {
+		return nil, err
+	}
 	var baseURLs []*ChannelBaseURL
 	err := DB.Where("channel_id = ?", channelID).
 		Order("sort_order asc").
@@ -73,6 +112,9 @@ func GetChannelBaseURLs(channelID int) ([]*ChannelBaseURL, error) {
 func CacheGetChannelBaseURLs(channelID int) ([]*ChannelBaseURL, error) {
 	if channelID <= 0 {
 		return nil, nil
+	}
+	if err := EnsureChannelBaseURLSchema(); err != nil {
+		return nil, err
 	}
 	if !common.MemoryCacheEnabled {
 		return GetChannelBaseURLs(channelID)

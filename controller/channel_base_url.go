@@ -11,13 +11,13 @@ import (
 )
 
 type ChannelBaseURLManageRequest struct {
-	ChannelId  int     `json:"channel_id"`
-	Action     string  `json:"action"`
-	BaseURLId  *int    `json:"base_url_id,omitempty"`
-	Url        *string `json:"url,omitempty"`
-	Enabled    *bool   `json:"enabled,omitempty"`
-	Weight     *int    `json:"weight,omitempty"`
-	SortOrder  *int    `json:"sort_order,omitempty"`
+	ChannelId int     `json:"channel_id"`
+	Action    string  `json:"action"`
+	BaseURLId *int    `json:"base_url_id,omitempty"`
+	Url       *string `json:"url,omitempty"`
+	Enabled   *bool   `json:"enabled,omitempty"`
+	Weight    *int    `json:"weight,omitempty"`
+	SortOrder *int    `json:"sort_order,omitempty"`
 }
 
 func ManageChannelBaseURLs(c *gin.Context) {
@@ -42,6 +42,10 @@ func ManageChannelBaseURLs(c *gin.Context) {
 			"success": false,
 			"message": "渠道不存在",
 		})
+		return
+	}
+	if err := model.EnsureChannelBaseURLSchema(); err != nil {
+		common.ApiError(c, err)
 		return
 	}
 
