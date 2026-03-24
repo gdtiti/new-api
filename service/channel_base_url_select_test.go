@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -76,6 +77,19 @@ func buildGinContextWithChannelAffinity(t *testing.T, cacheKey string, ttlSecond
 		CacheKey:   cacheKey,
 		TTLSeconds: ttlSeconds,
 	})
+	return ctx
+}
+
+func buildGinJSONContext(t *testing.T, path string, body string) *gin.Context {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	if path == "" {
+		path = "/v1/chat/completions"
+	}
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx.Request = req
 	return ctx
 }
 
@@ -170,7 +184,7 @@ func TestSelectChannelBaseURL_ForcedByID_AllowsDisabledAndReturnsIndex(t *testin
 	require.False(t, got.UsedAffinity)
 }
 
-func TestSelectChannelBaseURL_TierSelectsOnlyMinSortOrderTier(t *testing.T) {
+func TestSelectChannelBaseURL_AllEnabledRowsParticipateAcrossSortOrders(t *testing.T) {
 	ensureChannelBaseURLSchema(t)
 	truncateChannelBaseURLTables(t)
 	disableMemoryCacheForTest(t)
@@ -203,12 +217,15 @@ func TestSelectChannelBaseURL_TierSelectsOnlyMinSortOrderTier(t *testing.T) {
 	})
 
 	rand.Seed(7)
-	for i := 0; i < 200; i++ {
+	counts := map[int]int{}
+	for i := 0; i < 400; i++ {
 		got, apiErr := SelectChannelBaseURL(nil, ch, 0)
 		require.Nil(t, apiErr)
-		require.NotEqual(t, 3, got.BaseURLID)
-		require.NotEqual(t, "https://tier5.example", got.URL)
+		counts[got.BaseURLID]++
 	}
+	require.Greater(t, counts[3], 0, "higher sort_order row should still participate in load balancing")
+	require.Greater(t, counts[3], counts[1], "weight should dominate over sort_order")
+	require.Greater(t, counts[3], counts[2], "weight should dominate over sort_order")
 }
 
 func TestSelectChannelBaseURL_WeightedDistribution_ZeroWeightActsAsOne(t *testing.T) {
@@ -251,7 +268,7 @@ func TestSelectChannelBaseURL_WeightedDistribution_ZeroWeightActsAsOne(t *testin
 	require.Equal(t, draws, counts[11]+counts[22])
 }
 
-func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDInTier(t *testing.T) {
+func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDAcrossAllCandidates(t *testing.T) {
 	ensureChannelBaseURLSchema(t)
 	truncateChannelBaseURLTables(t)
 	disableMemoryCacheForTest(t)
@@ -272,7 +289,7 @@ func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDInTier(t *testing.
 		Url:       "https://aff-b.example",
 		Enabled:   true,
 		Weight:    1,
-		SortOrder: 0,
+		SortOrder: 9,
 	})
 
 	cacheKey := fmt.Sprintf("test:aff:%s", strings.ReplaceAll(t.Name(), "/", "_"))
@@ -290,6 +307,99 @@ func TestSelectChannelBaseURL_AffinityStrategyA_PreferCachedIDInTier(t *testing.
 	require.True(t, got.UsedAffinity)
 	require.Equal(t, 20, got.BaseURLID)
 	require.Equal(t, "https://aff-b.example", got.URL)
+}
+
+func TestSelectChannelBaseURL_GenericAffinityByUserContext_IsStableAndDistributed(t *testing.T) {
+	ensureChannelBaseURLSchema(t)
+	truncateChannelBaseURLTables(t)
+	disableMemoryCacheForTest(t)
+
+	ch := seedChannelForTest(t, 8, "")
+
+	seedChannelBaseURL(t, &model.ChannelBaseURL{
+		Id:        101,
+		ChannelId: ch.Id,
+		Url:       "https://user-aff-1.example",
+		Enabled:   true,
+		Weight:    1,
+		SortOrder: 0,
+	})
+	seedChannelBaseURL(t, &model.ChannelBaseURL{
+		Id:        102,
+		ChannelId: ch.Id,
+		Url:       "https://user-aff-2.example",
+		Enabled:   true,
+		Weight:    1,
+		SortOrder: 5,
+	})
+	seedChannelBaseURL(t, &model.ChannelBaseURL{
+		Id:        103,
+		ChannelId: ch.Id,
+		Url:       "https://user-aff-3.example",
+		Enabled:   true,
+		Weight:    1,
+		SortOrder: 10,
+	})
+
+	ctx1 := buildGinJSONContext(t, "/v1/chat/completions", `{}`)
+	common.SetContextKey(ctx1, constant.ContextKeyUserId, 1001)
+	got1, apiErr := SelectChannelBaseURL(ctx1, ch, 0)
+	require.Nil(t, apiErr)
+	require.True(t, got1.UsedAffinity)
+
+	ctx2 := buildGinJSONContext(t, "/v1/chat/completions", `{}`)
+	common.SetContextKey(ctx2, constant.ContextKeyUserId, 1001)
+	got2, apiErr := SelectChannelBaseURL(ctx2, ch, 0)
+	require.Nil(t, apiErr)
+	require.True(t, got2.UsedAffinity)
+	require.Equal(t, got1.BaseURLID, got2.BaseURLID, "same user should keep base_url affinity before cache is populated")
+
+	selectedByUsers := map[int]struct{}{}
+	for userID := 2001; userID < 2021; userID++ {
+		ctx := buildGinJSONContext(t, "/v1/chat/completions", `{}`)
+		common.SetContextKey(ctx, constant.ContextKeyUserId, userID)
+		got, apiErr := SelectChannelBaseURL(ctx, ch, 0)
+		require.Nil(t, apiErr)
+		require.True(t, got.UsedAffinity)
+		selectedByUsers[got.BaseURLID] = struct{}{}
+	}
+	require.GreaterOrEqual(t, len(selectedByUsers), 2, "different users should be distributed across multiple base_url rows")
+}
+
+func TestSelectChannelBaseURL_GenericAffinityByRequestBodyUserField(t *testing.T) {
+	ensureChannelBaseURLSchema(t)
+	truncateChannelBaseURLTables(t)
+	disableMemoryCacheForTest(t)
+
+	ch := seedChannelForTest(t, 9, "")
+
+	seedChannelBaseURL(t, &model.ChannelBaseURL{
+		Id:        201,
+		ChannelId: ch.Id,
+		Url:       "https://body-aff-1.example",
+		Enabled:   true,
+		Weight:    1,
+		SortOrder: 0,
+	})
+	seedChannelBaseURL(t, &model.ChannelBaseURL{
+		Id:        202,
+		ChannelId: ch.Id,
+		Url:       "https://body-aff-2.example",
+		Enabled:   true,
+		Weight:    1,
+		SortOrder: 0,
+	})
+
+	ctx1 := buildGinJSONContext(t, "/v1/chat/completions", `{"user":"alice"}`)
+	got1, apiErr := SelectChannelBaseURL(ctx1, ch, 0)
+	require.Nil(t, apiErr)
+	require.True(t, got1.UsedAffinity)
+
+	ctx2 := buildGinJSONContext(t, "/v1/chat/completions", `{"user":"alice"}`)
+	got2, apiErr := SelectChannelBaseURL(ctx2, ch, 0)
+	require.Nil(t, apiErr)
+	require.True(t, got2.UsedAffinity)
+	require.Equal(t, got1.BaseURLID, got2.BaseURLID, "same request user field should map to the same base_url")
 }
 
 func TestSelectChannelBaseURL_AffinityStrategyA_FallbackWhenCachedIDUnavailable(t *testing.T) {
@@ -327,7 +437,7 @@ func TestSelectChannelBaseURL_AffinityStrategyA_FallbackWhenCachedIDUnavailable(
 
 	got, apiErr := SelectChannelBaseURL(ctx, ch, 0)
 	require.Nil(t, apiErr)
-	require.False(t, got.UsedAffinity)
+	require.True(t, got.UsedAffinity)
 	require.Equal(t, 10, got.BaseURLID)
 	require.Equal(t, "https://only-enabled.example", got.URL)
 }

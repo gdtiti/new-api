@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"hash/fnv"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -43,6 +44,13 @@ type baseURLCandidate struct {
 	baseURL         *model.ChannelBaseURL
 	baseURLIndex    int
 	effectiveWeight int
+}
+
+type channelBaseURLAffinityKey struct {
+	cacheKeySuffix string
+	cacheKeyFull   string
+	stableKey      string
+	ttlSeconds     int
 }
 
 func getChannelBaseURLAffinityCache() *cachex.HybridCache[int] {
@@ -131,6 +139,66 @@ func buildChannelBaseURLAffinityKeyByChannelAffinityContext(c *gin.Context, chan
 	return keySuffix, keyFull, ttlSeconds, true
 }
 
+func buildChannelBaseURLAffinitySourceKey(src operation_setting.ChannelAffinityKeySource) string {
+	switch src.Type {
+	case "context_int", "context_string":
+		return src.Type + ":" + strings.TrimSpace(src.Key)
+	case "gjson":
+		return src.Type + ":" + strings.TrimSpace(src.Path)
+	default:
+		return strings.TrimSpace(src.Type)
+	}
+}
+
+func buildChannelBaseURLAffinityKeyByFallbackContext(c *gin.Context, channelID int) (channelBaseURLAffinityKey, bool) {
+	if c == nil || channelID <= 0 {
+		return channelBaseURLAffinityKey{}, false
+	}
+
+	ttlSeconds := 3600
+	if setting := operation_setting.GetChannelAffinitySetting(); setting != nil && setting.DefaultTTLSeconds > 0 {
+		ttlSeconds = setting.DefaultTTLSeconds
+	}
+
+	sources := []operation_setting.ChannelAffinityKeySource{
+		{Type: "context_int", Key: string(constant.ContextKeyUserId)},
+		{Type: "context_int", Key: string(constant.ContextKeyTokenId)},
+		{Type: "gjson", Path: "user"},
+		{Type: "gjson", Path: "metadata.user_id"},
+		{Type: "gjson", Path: "prompt_cache_key"},
+	}
+
+	for _, src := range sources {
+		value := extractChannelAffinityValue(c, src)
+		if value == "" {
+			continue
+		}
+		sourceKey := buildChannelBaseURLAffinitySourceKey(src)
+		stableKey := sourceKey + ":" + value + ":ch:" + strconv.Itoa(channelID)
+		keySuffix := "fallback:" + stableKey
+		return channelBaseURLAffinityKey{
+			cacheKeySuffix: keySuffix,
+			cacheKeyFull:   channelBaseURLAffinityCacheNamespace + ":" + keySuffix,
+			stableKey:      stableKey,
+			ttlSeconds:     ttlSeconds,
+		}, true
+	}
+
+	return channelBaseURLAffinityKey{}, false
+}
+
+func buildChannelBaseURLAffinityKey(c *gin.Context, channelID int) (channelBaseURLAffinityKey, bool) {
+	if keySuffix, keyFull, ttlSeconds, ok := buildChannelBaseURLAffinityKeyByChannelAffinityContext(c, channelID); ok {
+		return channelBaseURLAffinityKey{
+			cacheKeySuffix: keySuffix,
+			cacheKeyFull:   keyFull,
+			stableKey:      keySuffix,
+			ttlSeconds:     ttlSeconds,
+		}, true
+	}
+	return buildChannelBaseURLAffinityKeyByFallbackContext(c, channelID)
+}
+
 func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID int) (SelectedChannelBaseURL, *types.NewAPIError) {
 	if channel == nil {
 		return SelectedChannelBaseURL{}, types.NewError(fmt.Errorf("channel is nil"), types.ErrorCodeGetChannelFailed)
@@ -214,35 +282,17 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 		)
 	}
 
-	// Tiered selection: choose the smallest sort_order tier first (failover-friendly).
-	minSortOrder := candidates[0].baseURL.SortOrder
-	for _, cand := range candidates {
-		if cand.baseURL.SortOrder < minSortOrder {
-			minSortOrder = cand.baseURL.SortOrder
-		}
-	}
-	tier := make([]baseURLCandidate, 0, len(candidates))
-	for _, cand := range candidates {
-		if cand.baseURL.SortOrder == minSortOrder {
-			tier = append(tier, cand)
-		}
-	}
-	if len(tier) == 0 {
-		// Should never happen, but keep it safe.
-		tier = candidates
-	}
-
-	// URL-level affinity (Strategy A): prefer a stable base_url_id mapping under the same channel affinity key.
-	// Key dimension: channel_affinity_key + channel_id.
-	if keySuffix, keyFull, ttlSeconds, ok := buildChannelBaseURLAffinityKeyByChannelAffinityContext(c, channel.Id); ok {
-		setChannelBaseURLAffinityContext(c, keySuffix, ttlSeconds)
+	// URL-level affinity: prefer an existing stable base_url mapping under the same affinity key.
+	// Key dimension: channel affinity key (or fallback user key) + channel_id.
+	if affinityKey, ok := buildChannelBaseURLAffinityKey(c, channel.Id); ok {
+		setChannelBaseURLAffinityContext(c, affinityKey.cacheKeySuffix, affinityKey.ttlSeconds)
 
 		cache := getChannelBaseURLAffinityCache()
-		cachedID, found, cacheErr := cache.Get(keySuffix)
+		cachedID, found, cacheErr := cache.Get(affinityKey.cacheKeySuffix)
 		if cacheErr != nil {
-			common.SysError(fmt.Sprintf("channel base_url affinity cache get failed: key=%s, err=%v", keyFull, cacheErr))
+			common.SysError(fmt.Sprintf("channel base_url affinity cache get failed: key=%s, err=%v", affinityKey.cacheKeyFull, cacheErr))
 		} else if found && cachedID > 0 {
-			for _, cand := range tier {
+			for _, cand := range candidates {
 				if cand.baseURL != nil && cand.baseURL.Id == cachedID {
 					return SelectedChannelBaseURL{
 						URL:          strings.TrimSpace(cand.baseURL.Url),
@@ -254,10 +304,20 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 				}
 			}
 		}
+
+		if selected, ok := selectWeightedBaseURLCandidateByStableKey(candidates, affinityKey.stableKey); ok {
+			return SelectedChannelBaseURL{
+				URL:          strings.TrimSpace(selected.baseURL.Url),
+				BaseURLID:    selected.baseURL.Id,
+				BaseURLIndex: selected.baseURLIndex,
+				Legacy:       false,
+				UsedAffinity: true,
+			}, nil
+		}
 	}
 
-	// Weighted load balance within the chosen tier.
-	selected, ok := selectWeightedBaseURLCandidate(tier)
+	// Weighted load balance across all enabled rows.
+	selected, ok := selectWeightedBaseURLCandidate(candidates)
 	if !ok {
 		return SelectedChannelBaseURL{}, types.NewErrorWithStatusCode(
 			fmt.Errorf("渠道 %d base_url 选择失败（候选为空）", channel.Id),
@@ -273,6 +333,59 @@ func SelectChannelBaseURL(c *gin.Context, channel *model.Channel, forceBaseURLID
 		Legacy:       false,
 		UsedAffinity: false,
 	}, nil
+}
+
+func selectWeightedBaseURLCandidateByStableKey(candidates []baseURLCandidate, stableKey string) (baseURLCandidate, bool) {
+	if len(candidates) == 0 || strings.TrimSpace(stableKey) == "" {
+		return baseURLCandidate{}, false
+	}
+
+	if len(candidates) == 1 {
+		if candidates[0].baseURL == nil {
+			return baseURLCandidate{}, false
+		}
+		return candidates[0], true
+	}
+
+	sumWeight := 0
+	for _, cand := range candidates {
+		if cand.baseURL == nil {
+			continue
+		}
+		w := cand.effectiveWeight
+		if w <= 0 {
+			w = 1
+		}
+		sumWeight += w
+	}
+	if sumWeight <= 0 {
+		idx := int(stableHashUint64(stableKey) % uint64(len(candidates)))
+		return candidates[idx], candidates[idx].baseURL != nil
+	}
+
+	r := int(stableHashUint64(stableKey) % uint64(sumWeight))
+	for _, cand := range candidates {
+		if cand.baseURL == nil {
+			continue
+		}
+		w := cand.effectiveWeight
+		if w <= 0 {
+			w = 1
+		}
+		r -= w
+		if r < 0 {
+			return cand, true
+		}
+	}
+
+	last := candidates[len(candidates)-1]
+	return last, last.baseURL != nil
+}
+
+func stableHashUint64(s string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(s))
+	return h.Sum64()
 }
 
 func selectWeightedBaseURLCandidate(candidates []baseURLCandidate) (baseURLCandidate, bool) {
