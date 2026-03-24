@@ -437,6 +437,11 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) {
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, err.Error()))
+	if baseURLID := common.GetContextKeyInt(c, constant.ContextKeyChannelBaseUrlId); baseURLID > 0 {
+		if recordErr := service.RecordChannelBaseURLFailure(channelError.ChannelId, baseURLID, c.GetString("original_model"), err.StatusCode); recordErr != nil {
+			common.SysError(fmt.Sprintf("record channel base_url failure failed: channel_id=%d, base_url_id=%d, err=%v", channelError.ChannelId, baseURLID, recordErr))
+		}
+	}
 	if service.ShouldDisableChannel(channelError.ChannelType, err) && channelError.AutoBan {
 		gopool.Go(func() {
 			service.DisableChannel(channelError, err.ErrorWithStatusCode())

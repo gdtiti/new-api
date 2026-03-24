@@ -782,6 +782,10 @@ func TestChannel(c *gin.Context) {
 
 var testAllChannelsLock sync.Mutex
 var testAllChannelsRunning bool = false
+var testAllChannelBaseURLsLock sync.Mutex
+var testAllChannelBaseURLsRunning bool = false
+
+type channelBaseURLHealthCheckRunner func(channel *model.Channel, testModel string, endpointType string, isStream bool, forceBaseURLID int) testResult
 
 func testAllChannels(notify bool) error {
 
@@ -867,6 +871,86 @@ func TestAllChannels(c *gin.Context) {
 	})
 }
 
+func runChannelBaseURLHealthChecksOnce(run channelBaseURLHealthCheckRunner) error {
+	if run == nil {
+		run = testChannel
+	}
+	if err := model.EnsureChannelBaseURLSchema(); err != nil {
+		return err
+	}
+
+	var baseURLs []*model.ChannelBaseURL
+	if err := model.DB.Where("health_check_enabled = ?", true).
+		Order("channel_id asc").
+		Order("id asc").
+		Find(&baseURLs).Error; err != nil {
+		return err
+	}
+
+	for _, baseURL := range baseURLs {
+		if baseURL == nil || baseURL.ChannelId <= 0 || baseURL.Id <= 0 {
+			continue
+		}
+		if strings.TrimSpace(baseURL.HealthCheckModel) == "" {
+			continue
+		}
+
+		channel, err := model.CacheGetChannel(baseURL.ChannelId)
+		if err != nil {
+			channel, err = model.GetChannelById(baseURL.ChannelId, true)
+			if err != nil || channel == nil {
+				common.SysError(fmt.Sprintf("skip base_url health check because channel is unavailable: channel_id=%d base_url_id=%d err=%v", baseURL.ChannelId, baseURL.Id, err))
+				continue
+			}
+		}
+		if channel.Status != common.ChannelStatusEnabled {
+			continue
+		}
+
+		result := run(channel, baseURL.HealthCheckModel, baseURL.HealthCheckEndpointType, false, baseURL.Id)
+		success := result.localErr == nil && result.newAPIError == nil
+		message := "ok"
+		if result.newAPIError != nil {
+			message = result.newAPIError.Error()
+		} else if result.localErr != nil {
+			message = result.localErr.Error()
+		}
+		if err := service.UpdateChannelBaseURLHealthCheckResult(channel.Id, baseURL.Id, success, message); err != nil {
+			common.SysError(fmt.Sprintf("update base_url health check result failed: channel_id=%d, base_url_id=%d, success=%t, err=%v", channel.Id, baseURL.Id, success, err))
+		}
+		time.Sleep(common.RequestInterval)
+	}
+	return nil
+}
+
+func testAllChannelBaseURLs(notify bool) error {
+	testAllChannelBaseURLsLock.Lock()
+	if testAllChannelBaseURLsRunning {
+		testAllChannelBaseURLsLock.Unlock()
+		return errors.New("BaseURL 健康检查已在运行中")
+	}
+	testAllChannelBaseURLsRunning = true
+	testAllChannelBaseURLsLock.Unlock()
+
+	gopool.Go(func() {
+		defer func() {
+			testAllChannelBaseURLsLock.Lock()
+			testAllChannelBaseURLsRunning = false
+			testAllChannelBaseURLsLock.Unlock()
+		}()
+
+		err := runChannelBaseURLHealthChecksOnce(testChannel)
+		if err != nil {
+			common.SysError("automatically base_url health check failed: " + err.Error())
+			return
+		}
+		if notify {
+			service.NotifyRootUser(dto.NotifyTypeChannelTest, "BaseURL 健康检查完成", "已完成启用健康检查的 BaseURL 测试")
+		}
+	})
+	return nil
+}
+
 var autoTestChannelsOnce sync.Once
 
 func AutomaticallyTestChannels() {
@@ -875,22 +959,43 @@ func AutomaticallyTestChannels() {
 		return
 	}
 	autoTestChannelsOnce.Do(func() {
-		for {
-			if !operation_setting.GetMonitorSetting().AutoTestChannelEnabled {
-				time.Sleep(1 * time.Minute)
-				continue
-			}
+		gopool.Go(func() {
 			for {
-				frequency := operation_setting.GetMonitorSetting().AutoTestChannelMinutes
-				time.Sleep(time.Duration(int(math.Round(frequency))) * time.Minute)
-				common.SysLog(fmt.Sprintf("automatically test channels with interval %f minutes", frequency))
-				common.SysLog("automatically testing all channels")
-				_ = testAllChannels(false)
-				common.SysLog("automatically channel test finished")
 				if !operation_setting.GetMonitorSetting().AutoTestChannelEnabled {
-					break
+					time.Sleep(1 * time.Minute)
+					continue
+				}
+				for {
+					frequency := operation_setting.GetMonitorSetting().AutoTestChannelMinutes
+					time.Sleep(time.Duration(int(math.Round(frequency))) * time.Minute)
+					common.SysLog(fmt.Sprintf("automatically test channels with interval %f minutes", frequency))
+					common.SysLog("automatically testing all channels")
+					_ = testAllChannels(false)
+					common.SysLog("automatically channel test finished")
+					if !operation_setting.GetMonitorSetting().AutoTestChannelEnabled {
+						break
+					}
 				}
 			}
-		}
+		})
+		gopool.Go(func() {
+			for {
+				if !operation_setting.GetMonitorSetting().AutoTestChannelBaseURLEnabled {
+					time.Sleep(1 * time.Minute)
+					continue
+				}
+				for {
+					frequency := operation_setting.GetMonitorSetting().AutoTestChannelBaseURLMinutes
+					time.Sleep(time.Duration(int(math.Round(frequency))) * time.Minute)
+					common.SysLog(fmt.Sprintf("automatically test channel base_urls with interval %f minutes", frequency))
+					common.SysLog("automatically testing health-enabled base_urls")
+					_ = testAllChannelBaseURLs(false)
+					common.SysLog("automatically base_url health check finished")
+					if !operation_setting.GetMonitorSetting().AutoTestChannelBaseURLEnabled {
+						break
+					}
+				}
+			}
+		})
 	})
 }

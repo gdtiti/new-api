@@ -25,7 +25,33 @@ type ChannelBaseURL struct {
 	Enabled   bool `json:"enabled" gorm:"index;default:true"`
 	Weight    int  `json:"weight" gorm:"default:1"`
 	SortOrder int  `json:"sort_order" gorm:"index;default:0"`
+
+	AutoDisableEnabled        bool   `json:"auto_disable_enabled" gorm:"default:false"`
+	AutoDisableStatusCodes    string `json:"auto_disable_status_codes" gorm:"type:varchar(255);default:''"`
+	AutoDisableErrorThreshold int    `json:"auto_disable_error_threshold" gorm:"default:0"`
+	AutoDisableModels         string `json:"auto_disable_models" gorm:"type:text"`
+
+	DisableSource         string `json:"disable_source" gorm:"type:varchar(32);default:''"`
+	DisableReason         string `json:"disable_reason" gorm:"type:text"`
+	DisabledAt            int64  `json:"disabled_at" gorm:"bigint;default:0"`
+	ConsecutiveFailures   int    `json:"consecutive_failures" gorm:"default:0"`
+	LastFailureStatusCode int    `json:"last_failure_status_code" gorm:"default:0"`
+	LastFailureModel      string `json:"last_failure_model" gorm:"type:varchar(255);default:''"`
+	LastFailureAt         int64  `json:"last_failure_at" gorm:"bigint;default:0"`
+
+	HealthCheckEnabled      bool   `json:"health_check_enabled" gorm:"default:false"`
+	HealthCheckModel        string `json:"health_check_model" gorm:"type:varchar(255);default:''"`
+	HealthCheckEndpointType string `json:"health_check_endpoint_type" gorm:"type:varchar(64);default:''"`
+	LastHealthCheckAt       int64  `json:"last_health_check_at" gorm:"bigint;default:0"`
+	LastHealthCheckSuccess  bool   `json:"last_health_check_success" gorm:"default:false"`
+	LastHealthCheckMessage  string `json:"last_health_check_message" gorm:"type:text"`
 }
+
+const (
+	ChannelBaseURLDisableSourceManual      = "manual"
+	ChannelBaseURLDisableSourceAutoError   = "auto_error"
+	ChannelBaseURLDisableSourceHealthCheck = "health_check"
+)
 
 var (
 	channelBaseURLSchemaEnsureLock sync.Mutex
@@ -40,14 +66,62 @@ func (b *ChannelBaseURL) BeforeCreate(tx *gorm.DB) error {
 	if b.UpdatedAt == 0 {
 		b.UpdatedAt = now
 	}
-	b.Url = strings.TrimSpace(b.Url)
+	b.normalize()
 	return nil
 }
 
 func (b *ChannelBaseURL) BeforeUpdate(tx *gorm.DB) error {
 	b.UpdatedAt = common.GetTimestamp()
-	b.Url = strings.TrimSpace(b.Url)
+	b.normalize()
 	return nil
+}
+
+func (b *ChannelBaseURL) normalize() {
+	b.Url = strings.TrimSpace(b.Url)
+	b.AutoDisableStatusCodes = strings.TrimSpace(b.AutoDisableStatusCodes)
+	b.AutoDisableModels = strings.TrimSpace(b.AutoDisableModels)
+	b.DisableSource = strings.TrimSpace(b.DisableSource)
+	b.DisableReason = strings.TrimSpace(b.DisableReason)
+	b.LastFailureModel = strings.TrimSpace(b.LastFailureModel)
+	b.HealthCheckModel = strings.TrimSpace(b.HealthCheckModel)
+	b.HealthCheckEndpointType = strings.TrimSpace(b.HealthCheckEndpointType)
+	b.LastHealthCheckMessage = strings.TrimSpace(b.LastHealthCheckMessage)
+}
+
+func (b *ChannelBaseURL) ClearDisableState() {
+	if b == nil {
+		return
+	}
+	b.DisableSource = ""
+	b.DisableReason = ""
+	b.DisabledAt = 0
+}
+
+func (b *ChannelBaseURL) ResetFailureState() {
+	if b == nil {
+		return
+	}
+	b.ConsecutiveFailures = 0
+}
+
+func (b *ChannelBaseURL) MarkManualEnabled() {
+	if b == nil {
+		return
+	}
+	b.Enabled = true
+	b.ClearDisableState()
+	b.ResetFailureState()
+}
+
+func (b *ChannelBaseURL) MarkManualDisabled() {
+	if b == nil {
+		return
+	}
+	b.Enabled = false
+	b.DisableSource = ChannelBaseURLDisableSourceManual
+	b.DisableReason = ""
+	b.DisabledAt = common.GetTimestamp()
+	b.ResetFailureState()
 }
 
 func EnsureChannelBaseURLSchema() error {
@@ -64,15 +138,10 @@ func EnsureChannelBaseURLSchema() error {
 	if channelBaseURLSchemaEnsuredDB == DB {
 		return nil
 	}
-	if DB.Migrator().HasTable(&ChannelBaseURL{}) {
-		channelBaseURLSchemaEnsuredDB = DB
-		return nil
-	}
 	if err := DB.AutoMigrate(&ChannelBaseURL{}); err != nil {
 		return err
 	}
 	channelBaseURLSchemaEnsuredDB = DB
-	common.SysLog("channel_base_urls table was missing and has been auto-created")
 	return nil
 }
 

@@ -69,6 +69,33 @@ const ChannelBaseURLManageModal = ({
   const [editorEnabled, setEditorEnabled] = useState(true);
   const [editorWeight, setEditorWeight] = useState(1);
   const [editorSortOrder, setEditorSortOrder] = useState(0);
+  const [editorAutoDisableEnabled, setEditorAutoDisableEnabled] =
+    useState(false);
+  const [editorAutoDisableStatusCodes, setEditorAutoDisableStatusCodes] =
+    useState('');
+  const [
+    editorAutoDisableErrorThreshold,
+    setEditorAutoDisableErrorThreshold,
+  ] = useState(1);
+  const [editorAutoDisableModels, setEditorAutoDisableModels] = useState('');
+  const [editorHealthCheckEnabled, setEditorHealthCheckEnabled] =
+    useState(false);
+  const [editorHealthCheckModel, setEditorHealthCheckModel] = useState('');
+  const [editorHealthCheckEndpointType, setEditorHealthCheckEndpointType] =
+    useState('');
+
+  const getDisableSourceLabel = (value) => {
+    switch (value) {
+      case 'manual':
+        return t('手动禁用');
+      case 'auto_error':
+        return t('错误自动禁用');
+      case 'health_check':
+        return t('健康检查禁用');
+      default:
+        return t('无');
+    }
+  };
 
   const resetEditor = () => {
     setEditorMode('add');
@@ -77,6 +104,13 @@ const ChannelBaseURLManageModal = ({
     setEditorEnabled(true);
     setEditorWeight(1);
     setEditorSortOrder(0);
+    setEditorAutoDisableEnabled(false);
+    setEditorAutoDisableStatusCodes('');
+    setEditorAutoDisableErrorThreshold(1);
+    setEditorAutoDisableModels('');
+    setEditorHealthCheckEnabled(false);
+    setEditorHealthCheckModel('');
+    setEditorHealthCheckEndpointType('');
   };
 
   const loadBaseUrls = async () => {
@@ -191,6 +225,17 @@ const ChannelBaseURLManageModal = ({
     setEditorSortOrder(
       Number.isFinite(Number(item?.sort_order)) ? Number(item?.sort_order) : 0,
     );
+    setEditorAutoDisableEnabled(normalizeEnabled(item?.auto_disable_enabled));
+    setEditorAutoDisableStatusCodes(item?.auto_disable_status_codes || '');
+    setEditorAutoDisableErrorThreshold(
+      Number.isFinite(Number(item?.auto_disable_error_threshold))
+        ? Number(item?.auto_disable_error_threshold)
+        : 1,
+    );
+    setEditorAutoDisableModels(item?.auto_disable_models || '');
+    setEditorHealthCheckEnabled(normalizeEnabled(item?.health_check_enabled));
+    setEditorHealthCheckModel(item?.health_check_model || '');
+    setEditorHealthCheckEndpointType(item?.health_check_endpoint_type || '');
     setShowEditor(true);
   };
 
@@ -204,6 +249,24 @@ const ChannelBaseURLManageModal = ({
       showError(t('BaseURL ID 缺失'));
       return;
     }
+    if (editorAutoDisableEnabled) {
+      if (!editorAutoDisableStatusCodes.trim()) {
+        showError(t('请输入自动禁用状态码'));
+        return;
+      }
+      if (!Number.isFinite(Number(editorAutoDisableErrorThreshold))) {
+        showError(t('请输入自动禁用错误次数'));
+        return;
+      }
+      if (Number(editorAutoDisableErrorThreshold) <= 0) {
+        showError(t('自动禁用错误次数必须大于 0'));
+        return;
+      }
+    }
+    if (editorHealthCheckEnabled && !editorHealthCheckModel.trim()) {
+      showError(t('请输入健康检查模型'));
+      return;
+    }
 
     setEditorSubmitting(true);
     try {
@@ -213,6 +276,13 @@ const ChannelBaseURLManageModal = ({
         enabled: editorEnabled,
         weight: editorWeight,
         sort_order: editorSortOrder,
+        auto_disable_enabled: editorAutoDisableEnabled,
+        auto_disable_status_codes: editorAutoDisableStatusCodes.trim(),
+        auto_disable_error_threshold: Number(editorAutoDisableErrorThreshold),
+        auto_disable_models: editorAutoDisableModels.trim(),
+        health_check_enabled: editorHealthCheckEnabled,
+        health_check_model: editorHealthCheckModel.trim(),
+        health_check_endpoint_type: editorHealthCheckEndpointType.trim(),
       };
       if (editorMode === 'edit') {
         payload.base_url_id = editorBaseUrlId;
@@ -301,6 +371,55 @@ const ChannelBaseURLManageModal = ({
         dataIndex: 'sort_order',
         width: 90,
         render: (v) => <Text>{Number.isFinite(Number(v)) ? v : '-'}</Text>,
+      },
+      {
+        title: t('禁用来源'),
+        dataIndex: 'disable_source',
+        width: 130,
+        render: (value, record) => {
+          if (normalizeEnabled(record?.enabled)) {
+            return <Text type='tertiary'>{t('无')}</Text>;
+          }
+          return (
+            <Tag color='orange' shape='circle' size='small'>
+              {getDisableSourceLabel(value)}
+            </Tag>
+          );
+        },
+      },
+      {
+        title: t('连续失败'),
+        dataIndex: 'consecutive_failures',
+        width: 110,
+        render: (value) => (
+          <Text>{Number.isFinite(Number(value)) ? Number(value) : 0}</Text>
+        ),
+      },
+      {
+        title: t('健康检查'),
+        key: 'health_check_status',
+        width: 220,
+        render: (_, record) => {
+          const checkedAt = Number(record?.last_health_check_at || 0);
+          if (!checkedAt) {
+            return <Text type='tertiary'>{t('未检查')}</Text>;
+          }
+          const success = normalizeEnabled(record?.last_health_check_success);
+          return (
+            <div className='flex flex-col gap-1'>
+              <Tag
+                color={success ? 'green' : 'red'}
+                shape='circle'
+                size='small'
+              >
+                {success ? t('最近成功') : t('最近失败')}
+              </Tag>
+              <Text type='tertiary' size='small'>
+                {record?.last_health_check_message || '-'}
+              </Text>
+            </div>
+          );
+        },
       },
       {
         title: t('操作'),
@@ -482,6 +601,80 @@ const ChannelBaseURLManageModal = ({
               />
             </div>
           </div>
+
+          <div className='flex items-center justify-between gap-4'>
+            <Text strong>{t('启用错误自动禁用')}</Text>
+            <Switch
+              checked={editorAutoDisableEnabled}
+              onChange={setEditorAutoDisableEnabled}
+            />
+          </div>
+
+          <div className='flex items-center gap-4'>
+            <div className='flex flex-col gap-2 flex-1'>
+              <Text strong>{t('自动禁用状态码')}</Text>
+              <Input
+                value={editorAutoDisableStatusCodes}
+                onChange={setEditorAutoDisableStatusCodes}
+                placeholder={t('例如：401,503,500-599')}
+                disabled={!editorAutoDisableEnabled}
+              />
+            </div>
+            <div className='flex flex-col gap-2 flex-1'>
+              <Text strong>{t('自动禁用错误次数')}</Text>
+              <InputNumber
+                value={editorAutoDisableErrorThreshold}
+                onChange={setEditorAutoDisableErrorThreshold}
+                min={1}
+                precision={0}
+                placeholder={t('连续错误次数')}
+                disabled={!editorAutoDisableEnabled}
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+
+          <div className='flex flex-col gap-2'>
+            <Text strong>{t('自动禁用模型')}</Text>
+            <Input
+              value={editorAutoDisableModels}
+              onChange={setEditorAutoDisableModels}
+              placeholder={t('留空表示全部模型；多个模型用逗号分隔')}
+              disabled={!editorAutoDisableEnabled}
+              showClear
+            />
+          </div>
+
+          <div className='flex items-center justify-between gap-4'>
+            <Text strong>{t('启用健康检查')}</Text>
+            <Switch
+              checked={editorHealthCheckEnabled}
+              onChange={setEditorHealthCheckEnabled}
+            />
+          </div>
+
+          <div className='flex items-center gap-4'>
+            <div className='flex flex-col gap-2 flex-1'>
+              <Text strong>{t('健康检查模型')}</Text>
+              <Input
+                value={editorHealthCheckModel}
+                onChange={setEditorHealthCheckModel}
+                placeholder={t('例如：gpt-4o-mini')}
+                disabled={!editorHealthCheckEnabled}
+                showClear
+              />
+            </div>
+            <div className='flex flex-col gap-2 flex-1'>
+              <Text strong>{t('健康检查端点类型')}</Text>
+              <Input
+                value={editorHealthCheckEndpointType}
+                onChange={setEditorHealthCheckEndpointType}
+                placeholder={t('留空自动判断；例如：chat')}
+                disabled={!editorHealthCheckEnabled}
+                showClear
+              />
+            </div>
+          </div>
         </div>
       </Modal>
     </>
@@ -489,4 +682,3 @@ const ChannelBaseURLManageModal = ({
 };
 
 export default ChannelBaseURLManageModal;
-
