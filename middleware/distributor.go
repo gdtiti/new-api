@@ -192,6 +192,12 @@ func Distribute() func(c *gin.Context) {
 		}
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
+			baseURLID := common.GetContextKeyInt(c, constant.ContextKeyChannelBaseUrlId)
+			if baseURLID > 0 {
+				if err := service.RecordChannelBaseURLSuccess(channel.Id, baseURLID); err != nil {
+					common.SysError(fmt.Sprintf("record channel base_url success failed: channel_id=%d, base_url_id=%d, err=%v", channel.Id, baseURLID, err))
+				}
+			}
 			service.RecordChannelAffinity(c, channel.Id)
 			service.RecordChannelBaseURLAffinity(c)
 		}

@@ -42,15 +42,37 @@ func disableMemoryCacheForTest(t *testing.T) {
 func seedChannelBaseURL(t *testing.T, baseURL *model.ChannelBaseURL) {
 	t.Helper()
 	// ChannelBaseURL has gorm default tags on bool/int fields.
-	// Use explicit INSERT to ensure zero values (Enabled=false, Weight=0) are persisted as-is.
+	// Use explicit INSERT to ensure zero values and runtime state fields are persisted as-is.
 	require.NoError(t, model.DB.Exec(
-		"INSERT INTO channel_base_urls (id, channel_id, url, enabled, weight, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+		`INSERT INTO channel_base_urls (
+			id, channel_id, url, enabled, weight, sort_order,
+			auto_disable_enabled, auto_disable_status_codes, auto_disable_error_threshold, auto_disable_models,
+			disable_source, disable_reason, disabled_at, consecutive_failures, last_failure_status_code, last_failure_model, last_failure_at,
+			health_check_enabled, health_check_model, health_check_endpoint_type, last_health_check_at, last_health_check_success, last_health_check_message
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		baseURL.Id,
 		baseURL.ChannelId,
 		strings.TrimSpace(baseURL.Url),
 		baseURL.Enabled,
 		baseURL.Weight,
 		baseURL.SortOrder,
+		baseURL.AutoDisableEnabled,
+		strings.TrimSpace(baseURL.AutoDisableStatusCodes),
+		baseURL.AutoDisableErrorThreshold,
+		strings.TrimSpace(baseURL.AutoDisableModels),
+		strings.TrimSpace(baseURL.DisableSource),
+		strings.TrimSpace(baseURL.DisableReason),
+		baseURL.DisabledAt,
+		baseURL.ConsecutiveFailures,
+		baseURL.LastFailureStatusCode,
+		strings.TrimSpace(baseURL.LastFailureModel),
+		baseURL.LastFailureAt,
+		baseURL.HealthCheckEnabled,
+		strings.TrimSpace(baseURL.HealthCheckModel),
+		strings.TrimSpace(baseURL.HealthCheckEndpointType),
+		baseURL.LastHealthCheckAt,
+		baseURL.LastHealthCheckSuccess,
+		strings.TrimSpace(baseURL.LastHealthCheckMessage),
 	).Error)
 }
 
