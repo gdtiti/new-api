@@ -41,6 +41,7 @@ import {
 } from '../../helpers';
 import { ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
+import ParamOverrideEntry from '../../components/table/usage-logs/components/ParamOverrideEntry';
 
 export const useLogsData = () => {
   const { t } = useTranslation();
@@ -131,6 +132,8 @@ export const useLogsData = () => {
   ] = useState(false);
   const [channelAffinityUsageCacheTarget, setChannelAffinityUsageCacheTarget] =
     useState(null);
+  const [showParamOverrideModal, setShowParamOverrideModal] = useState(false);
+  const [paramOverrideTarget, setParamOverrideTarget] = useState(null);
 
   // Load saved column preferences from localStorage
   useEffect(() => {
@@ -340,6 +343,20 @@ export const useLogsData = () => {
       key_fp: a.key_fp || '',
     });
     setShowChannelAffinityUsageCacheModal(true);
+  };
+
+  const openParamOverrideModal = (log, other) => {
+    const lines = Array.isArray(other?.po) ? other.po.filter(Boolean) : [];
+    if (lines.length === 0) {
+      return;
+    }
+    setParamOverrideTarget({
+      lines,
+      modelName: log?.model_name || '',
+      requestId: log?.request_id || '',
+      requestPath: other?.request_path || '',
+    });
+    setShowParamOverrideModal(true);
   };
 
   // Format logs data
@@ -574,6 +591,21 @@ export const useLogsData = () => {
         expandDataLocal.push({
           key: t('请求路径'),
           value: other.request_path,
+        });
+      }
+      if (Array.isArray(other?.po) && other.po.length > 0) {
+        expandDataLocal.push({
+          key: t('鍙傛暟瑕嗙洊'),
+          value: (
+            <ParamOverrideEntry
+              count={other.po.length}
+              t={t}
+              onOpen={(event) => {
+                event.stopPropagation();
+                openParamOverrideModal(logs[i], other);
+              }}
+            />
+          ),
         });
       }
       if (other?.billing_source === 'subscription') {
@@ -823,6 +855,9 @@ export const useLogsData = () => {
     setShowChannelAffinityUsageCacheModal,
     channelAffinityUsageCacheTarget,
     openChannelAffinityUsageCacheModal,
+    showParamOverrideModal,
+    setShowParamOverrideModal,
+    paramOverrideTarget,
 
     // Functions
     loadLogs,
@@ -834,6 +869,7 @@ export const useLogsData = () => {
     setLogsFormat,
     hasExpandableRows,
     setLogType,
+    openParamOverrideModal,
 
     // Translation
     t,

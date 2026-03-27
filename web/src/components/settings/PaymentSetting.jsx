@@ -23,6 +23,7 @@ import SettingsGeneralPayment from '../../pages/Setting/Payment/SettingsGeneralP
 import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentGateway';
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
+import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 
@@ -128,7 +129,6 @@ const PaymentSetting = () => {
                 2,
               );
             } catch (error) {
-              console.error('解析TopupGroupRatio出错:', error);
               newInputs[item.key] = item.value;
             }
             break;
@@ -140,7 +140,6 @@ const PaymentSetting = () => {
                 2,
               );
             } catch (error) {
-              console.error('解析AmountOptions出错:', error);
               newInputs['AmountOptions'] = item.value;
             }
             break;
@@ -164,7 +163,6 @@ const PaymentSetting = () => {
                 2,
               );
             } catch (error) {
-              console.error('解析AmountDiscount出错:', error);
               newInputs['AmountDiscount'] = item.value;
             }
             break;
@@ -248,6 +246,9 @@ const PaymentSetting = () => {
         </Card>
         <Card style={{ marginTop: '10px' }}>
           <SettingsPaymentGatewayCreem options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGatewayWaffo options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>
