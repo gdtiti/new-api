@@ -57,7 +57,7 @@ const OAuth2Callback = (props) => {
         return;
       }
 
-      if (message === 'bind') {
+      if (data?.action === 'bind') {
         showSuccess(t('绑定成功！'));
         navigate('/console/personal');
       } else {

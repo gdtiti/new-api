@@ -128,8 +128,14 @@ func Distribute() func(c *gin.Context) {
 
 				if preferredChannelID, found := service.GetPreferredChannelByAffinity(c, modelRequest.Model, usingGroup); found {
 					preferred, err := model.CacheGetChannel(preferredChannelID)
-					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled {
-						if channelFilter != nil && !channelFilter(preferred) {
+					if err == nil && preferred != nil {
+						if preferred.Status != common.ChannelStatusEnabled {
+							if service.ShouldSkipRetryAfterChannelAffinityFailure(c) {
+								abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
+								return
+							}
+							preferred = nil
+						} else if channelFilter != nil && !channelFilter(preferred) {
 							preferred = nil
 						}
 					}

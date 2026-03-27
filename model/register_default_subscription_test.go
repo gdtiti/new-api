@@ -11,7 +11,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestGrantRegisterDefaultSubscription(t *testing.T) {
+func setupRegisterDefaultSubscriptionTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	prevDB := DB
+	prevLogDB := LOG_DB
+	prevUsingSQLite := common.UsingSQLite
+	prevRedisEnabled := common.RedisEnabled
+
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
@@ -19,6 +26,19 @@ func TestGrantRegisterDefaultSubscription(t *testing.T) {
 	LOG_DB = db
 	common.UsingSQLite = true
 	common.RedisEnabled = false
+
+	t.Cleanup(func() {
+		DB = prevDB
+		LOG_DB = prevLogDB
+		common.UsingSQLite = prevUsingSQLite
+		common.RedisEnabled = prevRedisEnabled
+	})
+
+	return db
+}
+
+func TestGrantRegisterDefaultSubscription(t *testing.T) {
+	db := setupRegisterDefaultSubscriptionTestDB(t)
 
 	require.NoError(t, db.AutoMigrate(&User{}, &SubscriptionPlan{}, &UserSubscription{}, &Log{}))
 
@@ -63,13 +83,7 @@ func TestGrantRegisterDefaultSubscription(t *testing.T) {
 }
 
 func TestGrantRegisterDefaultSubscriptionDisabledPlan(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	DB = db
-	LOG_DB = db
-	common.UsingSQLite = true
-	common.RedisEnabled = false
+	db := setupRegisterDefaultSubscriptionTestDB(t)
 
 	require.NoError(t, db.AutoMigrate(&User{}, &SubscriptionPlan{}, &UserSubscription{}, &Log{}))
 
@@ -103,13 +117,7 @@ func TestGrantRegisterDefaultSubscriptionDisabledPlan(t *testing.T) {
 }
 
 func TestFinalizeOAuthUserCreationGrantsDefaultSubscription(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	DB = db
-	LOG_DB = db
-	common.UsingSQLite = true
-	common.RedisEnabled = false
+	db := setupRegisterDefaultSubscriptionTestDB(t)
 
 	require.NoError(t, db.AutoMigrate(&User{}, &SubscriptionPlan{}, &UserSubscription{}, &Log{}))
 

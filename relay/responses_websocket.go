@@ -171,7 +171,7 @@ func ResponsesWssHelper(c *gin.Context, info *relaycommon.RelayInfo) *types.NewA
 	if strings.HasPrefix(info.OriginModelName, "gpt-4o-audio") {
 		service.PostAudioConsumeQuota(c, info, usage, "")
 	} else {
-		postConsumeQuota(c, info, usage)
+		service.PostTextConsumeQuota(c, info, usage, nil)
 	}
 	return nil
 }
