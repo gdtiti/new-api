@@ -21,11 +21,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   API,
   copy,
+  getCurrencyConfig,
   renderQuota,
+  renderQuotaWithPrompt,
   showError,
   showSuccess,
   timestamp2string,
 } from '../../helpers';
+import {
+  displayAmountToQuota,
+} from '../../helpers/quota';
 import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import {
@@ -78,6 +83,8 @@ const TemporaryUsersSetting = () => {
   const [groupOptions, setGroupOptions] = useState([]);
   const [createVisible, setCreateVisible] = useState(false);
   const [createdResult, setCreatedResult] = useState(null);
+  const currencyConfig = getCurrencyConfig();
+  const quotaInputIsAmount = currencyConfig.type !== 'TOKENS';
 
   const getInitValues = (groups = []) => ({
     username: '',
@@ -183,13 +190,13 @@ const TemporaryUsersSetting = () => {
   const createTemporaryUser = async (values) => {
     const payload = {
       ...values,
-      initial_quota: Number(values.initial_quota || 0),
+      initial_quota: displayAmountToQuota(values.initial_quota || 0),
       token_group: values.token_group || 'auto',
       token_name: values.token_name || 'temporary-default',
       token_unlimited_quota: values.token_unlimited_quota !== false,
       token_remain_quota: values.token_unlimited_quota
         ? 0
-        : Number(values.token_remain_quota || 0),
+        : displayAmountToQuota(values.token_remain_quota || 0),
     };
     if (values.token_expired_time instanceof Date) {
       payload.token_expired_time = Math.floor(
@@ -568,7 +575,14 @@ const TemporaryUsersSetting = () => {
                         field='initial_quota'
                         label={t('初始余额')}
                         min={0}
+                        precision={quotaInputIsAmount ? 2 : 0}
+                        step={quotaInputIsAmount ? 1 : 500000}
                         style={{ width: '100%' }}
+                        extraText={
+                          quotaInputIsAmount
+                            ? t('按当前显示金额输入，保存时会自动换算为系统额度')
+                            : renderQuotaWithPrompt(Number(values.initial_quota || 0))
+                        }
                       />
                     </Col>
                     <Col span={12}>
@@ -642,12 +656,18 @@ const TemporaryUsersSetting = () => {
                         field='token_remain_quota'
                         label={t('令牌剩余额度')}
                         min={0}
+                        precision={quotaInputIsAmount ? 2 : 0}
+                        step={quotaInputIsAmount ? 1 : 500000}
                         disabled={values.token_unlimited_quota !== false}
                         style={{ width: '100%' }}
                         extraText={
                           values.token_unlimited_quota !== false
                             ? t('已开启不限额，当前输入不会生效')
-                            : undefined
+                            : quotaInputIsAmount
+                              ? t('按当前显示金额输入，保存时会自动换算为系统额度')
+                              : renderQuotaWithPrompt(
+                                  Number(values.token_remain_quota || 0),
+                                )
                         }
                       />
                     </Col>
