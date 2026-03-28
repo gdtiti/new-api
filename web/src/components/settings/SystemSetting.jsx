@@ -43,6 +43,7 @@ import {
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import CustomOAuthSetting from './CustomOAuthSetting';
+import TemporaryUsersSetting from './TemporaryUsersSetting';
 
 const SystemSetting = () => {
   const { t } = useTranslation();
@@ -735,21 +736,22 @@ const SystemSetting = () => {
   return (
     <div>
       {isLoaded ? (
-        <Form
-          initValues={inputs}
-          onValueChange={handleFormChange}
-          getFormApi={(api) => (formApiRef.current = api)}
-        >
-          {({ formState, values, formApi }) => (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                marginTop: '10px',
-              }}
-            >
-              <Card>
+        <>
+          <Form
+            initValues={inputs}
+            onValueChange={handleFormChange}
+            getFormApi={(api) => (formApiRef.current = api)}
+          >
+            {({ formState, values, formApi }) => (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  marginTop: '10px',
+                }}
+              >
+                <Card>
                 <Form.Section text={t('通用设置')}>
                   <Row
                     gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
@@ -1698,26 +1700,28 @@ const SystemSetting = () => {
                 </Form.Section>
               </Card>
 
-              <Modal
-                title={t('确认取消密码登录')}
-                visible={showPasswordLoginConfirmModal}
-                onOk={handlePasswordLoginConfirm}
-                onCancel={() => {
-                  setShowPasswordLoginConfirmModal(false);
-                  formApiRef.current.setValue('PasswordLoginEnabled', true);
-                }}
-                okText={t('确认')}
-                cancelText={t('取消')}
-              >
-                <p>
-                  {t(
-                    '您确定要取消密码登录功能吗？这可能会影响用户的登录方式。',
-                  )}
-                </p>
-              </Modal>
-            </div>
-          )}
-        </Form>
+                <Modal
+                  title={t('确认取消密码登录')}
+                  visible={showPasswordLoginConfirmModal}
+                  onOk={handlePasswordLoginConfirm}
+                  onCancel={() => {
+                    setShowPasswordLoginConfirmModal(false);
+                    formApiRef.current.setValue('PasswordLoginEnabled', true);
+                  }}
+                  okText={t('确认')}
+                  cancelText={t('取消')}
+                >
+                  <p>
+                    {t(
+                      '您确定要取消密码登录功能吗？这可能会影响用户的登录方式。',
+                    )}
+                  </p>
+                </Modal>
+              </div>
+            )}
+          </Form>
+          <TemporaryUsersSetting />
+        </>
       ) : (
         <div
           style={{

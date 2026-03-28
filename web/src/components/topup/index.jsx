@@ -112,6 +112,60 @@ const TopUp = () => {
     discount: {},
   });
 
+  const normalizeRedemptionResult = (payload) => {
+    if (typeof payload === 'number') {
+      return {
+        grant_type: 'quota',
+        quota: payload,
+      };
+    }
+    if (payload && typeof payload === 'object') {
+      return payload;
+    }
+    return {
+      grant_type: 'quota',
+      quota: 0,
+    };
+  };
+
+  const renderRedemptionSuccessContent = (result) => {
+    const redeemedCount = Number(result?.redeemed_count || 0);
+    const maxRedeemCount = Number(result?.max_redeem_count || 0);
+    const progressNode =
+      maxRedeemCount > 0 ? (
+        <div
+          style={{
+            marginTop: 8,
+            color: 'var(--semi-color-text-2)',
+          }}
+        >
+          {t('兑换进度：')}
+          {`${redeemedCount}/${maxRedeemCount}`}
+        </div>
+      ) : null;
+
+    if (result?.grant_type === 'subscription') {
+      const planLabel =
+        result?.subscription_plan_title ||
+        (result?.subscription_plan_id
+          ? `#${result.subscription_plan_id}`
+          : t('未命名套餐'));
+      return (
+        <div>
+          <div>{t('已开通订阅套餐：') + planLabel}</div>
+          {progressNode}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div>{t('成功兑换额度：') + renderQuota(Number(result?.quota || 0))}</div>
+        {progressNode}
+      </div>
+    );
+  };
+
   const topUp = async () => {
     if (redemptionCode === '') {
       showInfo(t('请输入兑换码！'));
@@ -124,18 +178,24 @@ const TopUp = () => {
       });
       const { success, message, data } = res.data;
       if (success) {
+        const redemptionResult = normalizeRedemptionResult(data);
         showSuccess(t('兑换成功！'));
         Modal.success({
           title: t('兑换成功！'),
-          content: t('成功兑换额度：') + renderQuota(data),
+          content: renderRedemptionSuccessContent(redemptionResult),
           centered: true,
         });
-        if (userState.user) {
+        if (redemptionResult.grant_type === 'subscription') {
+          await getSubscriptionSelf();
+        } else if (userState.user) {
+          const quotaDelta = Number(redemptionResult.quota || 0);
           const updatedUser = {
             ...userState.user,
-            quota: userState.user.quota + data,
+            quota: userState.user.quota + quotaDelta,
           };
           userDispatch({ type: 'login', payload: updatedUser });
+        } else {
+          await getUserQuota();
         }
         setRedemptionCode('');
       } else {

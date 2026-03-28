@@ -281,6 +281,12 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
+		temporaryUserRoute := apiRouter.Group("/temporary-user")
+		{
+			temporaryUserRoute.POST("/", middleware.AdminAuth(), controller.CreateTemporaryUser)
+			temporaryUserRoute.GET("/", middleware.RootAuth(), controller.GetTemporaryUsers)
+			temporaryUserRoute.POST("/manage", middleware.RootAuth(), controller.ManageTemporaryUser)
+		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		logRoute.DELETE("/", middleware.AdminAuth(), controller.DeleteHistoryLogs)
