@@ -224,6 +224,7 @@ func relayWithPreparedInfo(c *gin.Context, relayFormat types.RelayFormat, reques
 		if !isResponsesWSRelay(relayInfo) {
 			bodyStorage, bodyErr := common.GetBodyStorage(c)
 			if bodyErr != nil {
+				service.ReleaseChannelConcurrencyReservation(c)
 				if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {
 					newAPIError = types.NewErrorWithStatusCode(bodyErr, types.ErrorCodeReadRequestBodyFailed, http.StatusRequestEntityTooLarge, types.ErrOptionWithSkipRetry())
 				} else {
@@ -250,6 +251,7 @@ func relayWithPreparedInfo(c *gin.Context, relayFormat types.RelayFormat, reques
 		default:
 			newAPIError = relayHandler(c, relayInfo)
 		}
+		service.ReleaseChannelConcurrencyReservation(c)
 
 		if newAPIError == nil {
 			relayInfo.LastError = nil
@@ -401,6 +403,7 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 
 	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, info.OriginModelName)
 	if newAPIError != nil {
+		service.ReleaseChannelConcurrencyReservation(c)
 		return nil, newAPIError
 	}
 	return channel, nil
@@ -623,6 +626,7 @@ func RelayTask(c *gin.Context) {
 		addUsedChannel(c, channel.Id)
 		bodyStorage, bodyErr := common.GetBodyStorage(c)
 		if bodyErr != nil {
+			service.ReleaseChannelConcurrencyReservation(c)
 			if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {
 				taskErr = service.TaskErrorWrapperLocal(bodyErr, "read_request_body_failed", http.StatusRequestEntityTooLarge)
 			} else {
@@ -633,6 +637,7 @@ func RelayTask(c *gin.Context) {
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		result, taskErr = relay.RelayTaskSubmit(c, relayInfo)
+		service.ReleaseChannelConcurrencyReservation(c)
 		if taskErr == nil {
 			break
 		}
