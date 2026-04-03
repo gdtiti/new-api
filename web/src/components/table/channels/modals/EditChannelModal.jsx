@@ -184,6 +184,7 @@ const EditChannelModal = (props) => {
     groups: ['default'],
     priority: 0,
     weight: 0,
+    max_concurrency: 0,
     tag: '',
     multi_key_mode: 'random',
     // 渠道额外设置的默认值
@@ -780,6 +781,9 @@ const EditChannelModal = (props) => {
       } else {
         data.groups = data.group.split(',');
       }
+      data.max_concurrency = Number.isFinite(Number(data.max_concurrency))
+        ? Number(data.max_concurrency)
+        : 0;
       if (data.model_mapping !== '') {
         data.model_mapping = JSON.stringify(
           JSON.parse(data.model_mapping),
@@ -990,6 +994,7 @@ const EditChannelModal = (props) => {
         (data.remark && data.remark.trim()) ||
         (data.priority && data.priority !== 0) ||
         (data.weight && data.weight !== 0) ||
+        (data.max_concurrency && data.max_concurrency !== 0) ||
         (data.proxy && data.proxy.trim()) ||
         (data.system_prompt && data.system_prompt.trim()) ||
         data.thinking_to_content ||
@@ -2440,6 +2445,21 @@ const EditChannelModal = (props) => {
                         placeholder={t('渠道权重')}
                         min={0}
                         onNumberChange={(value) => handleInputChange('weight', value)}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                  </Row>
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='max_concurrency'
+                        label={t('渠道最大并发数')}
+                        placeholder={t('渠道最大并发数')}
+                        min={0}
+                        extraText={t('0 表示不限制')}
+                        onNumberChange={(value) =>
+                          handleInputChange('max_concurrency', value)
+                        }
                         style={{ width: '100%' }}
                       />
                     </Col>
