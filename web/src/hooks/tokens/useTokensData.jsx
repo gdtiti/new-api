@@ -399,7 +399,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
   };
 
   // Batch copy tokens
-  const batchCopyTokens = (copyType) => {
+  const batchCopyTokens = async (copyType) => {
     if (selectedKeys.length === 0) {
       showError(t('请至少选择一个令牌！'));
       return;
