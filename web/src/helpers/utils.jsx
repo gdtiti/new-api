@@ -290,61 +290,6 @@ export function timestamp2string(timestamp) {
   );
 }
 
-function parseLocalDateInput(value) {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    if (value > 1e12) {
-      const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? null : date;
-    }
-    if (value > 1e9) {
-      const date = new Date(value * 1000);
-      return Number.isNaN(date.getTime()) ? null : date;
-    }
-  }
-
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const input = value.trim();
-  if (!input) {
-    return null;
-  }
-
-  const match = input.match(
-    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2})(?::(\d{2})(?::(\d{2}))?)?)?$/,
-  );
-  if (match) {
-    const [, year, month, day, hour = '0', minute = '0', second = '0'] = match;
-    const date = new Date(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      Number(second),
-    );
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const parsed = new Date(input);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-export function toLocalUnixMilliseconds(value) {
-  const date = parseLocalDateInput(value);
-  return date ? date.getTime() : 0;
-}
-
-export function toLocalUnixTimestamp(value) {
-  const milliseconds = toLocalUnixMilliseconds(value);
-  return milliseconds > 0 ? Math.floor(milliseconds / 1000) : 0;
-}
-
 export function timestamp2string1(
   timestamp,
   dataExportDefaultTime = 'hour',
