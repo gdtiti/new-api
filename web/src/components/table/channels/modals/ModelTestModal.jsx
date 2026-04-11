@@ -53,6 +53,10 @@ const ModelTestModal = ({
   setSelectedEndpointType,
   isStreamTest,
   setIsStreamTest,
+  selectedBaseUrlId,
+  setSelectedBaseUrlId,
+  baseUrlOptions,
+  baseUrlOptionsLoading,
   allSelectingRef,
   isMobile,
   t,
@@ -99,6 +103,11 @@ const ModelTestModal = ({
     },
     { value: 'embeddings', label: 'Embeddings (/v1/embeddings)' },
   ];
+
+  const baseUrlSelectOptionList = React.useMemo(() => {
+    const options = Array.isArray(baseUrlOptions) ? baseUrlOptions : [];
+    return [{ value: 0, label: t('自动/LB') }, ...options];
+  }, [baseUrlOptions, t]);
 
   const handleCopySelected = () => {
     if (selectedModelKeys.length === 0) {
@@ -225,6 +234,7 @@ const ModelTestModal = ({
                 record.model,
                 selectedEndpointType,
                 isStreamTest,
+                selectedBaseUrlId,
               )
             }
             loading={isTesting}
@@ -314,6 +324,19 @@ const ModelTestModal = ({
                 optionList={endpointTypeOptions}
                 className='!w-full min-w-0'
                 placeholder={t('选择端点类型')}
+              />
+            </div>
+            <div className='flex items-center gap-2 flex-1 min-w-0'>
+              <Typography.Text strong className='shrink-0'>
+                {t('BaseURL')}:
+              </Typography.Text>
+              <Select
+                value={selectedBaseUrlId}
+                onChange={setSelectedBaseUrlId}
+                optionList={baseUrlSelectOptionList}
+                className='!w-full min-w-0'
+                placeholder={t('选择 BaseURL')}
+                disabled={baseUrlOptionsLoading}
               />
             </div>
             <div className='flex items-center justify-between sm:justify-end gap-2 shrink-0'>

@@ -269,7 +269,7 @@ type OpenAIResponsesResponse struct {
 	ID                 string             `json:"id"`
 	Object             string             `json:"object"`
 	CreatedAt          int                `json:"created_at"`
-	Status             json.RawMessage    `json:"status"`
+	Status             string             `json:"status"`
 	Error              any                `json:"error,omitempty"`
 	IncompleteDetails  *IncompleteDetails `json:"incomplete_details,omitempty"`
 	Instructions       string             `json:"instructions"`
@@ -277,14 +277,14 @@ type OpenAIResponsesResponse struct {
 	Model              string             `json:"model"`
 	Output             []ResponsesOutput  `json:"output"`
 	ParallelToolCalls  bool               `json:"parallel_tool_calls"`
-	PreviousResponseID json.RawMessage    `json:"previous_response_id"`
+	PreviousResponseID string             `json:"previous_response_id"`
 	Reasoning          *Reasoning         `json:"reasoning"`
 	Store              bool               `json:"store"`
 	Temperature        float64            `json:"temperature"`
-	ToolChoice         json.RawMessage    `json:"tool_choice"`
+	ToolChoice         string             `json:"tool_choice"`
 	Tools              []map[string]any   `json:"tools"`
 	TopP               float64            `json:"top_p"`
-	Truncation         json.RawMessage    `json:"truncation"`
+	Truncation         string             `json:"truncation"`
 	Usage              *Usage             `json:"usage"`
 	User               json.RawMessage    `json:"user"`
 	Metadata           json.RawMessage    `json:"metadata"`

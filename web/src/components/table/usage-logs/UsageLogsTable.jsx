@@ -43,7 +43,6 @@ const LogsTable = (logsData) => {
     openChannelAffinityUsageCacheModal,
     hasExpandableRows,
     isAdminUser,
-    billingDisplayMode,
     t,
     COLUMN_KEYS,
   } = logsData;
@@ -57,7 +56,6 @@ const LogsTable = (logsData) => {
       showUserInfoFunc,
       openChannelAffinityUsageCacheModal,
       isAdminUser,
-      billingDisplayMode,
     });
   }, [
     t,
@@ -66,7 +64,6 @@ const LogsTable = (logsData) => {
     showUserInfoFunc,
     openChannelAffinityUsageCacheModal,
     isAdminUser,
-    billingDisplayMode,
   ]);
 
   // Filter columns based on visibility settings
@@ -102,7 +99,7 @@ const LogsTable = (logsData) => {
       loading={loading}
       scroll={compactMode ? undefined : { x: 'max-content' }}
       className='rounded-xl overflow-hidden'
-      size='small'
+      size='middle'
       empty={
         <Empty
           image={<IllustrationNoResult style={{ width: 150, height: 150 }} />}

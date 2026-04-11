@@ -25,14 +25,21 @@ import {
   Tooltip,
   Popover,
   Typography,
+  Button
 } from '@douyinfe/semi-ui';
 import {
+  timestamp2string,
   renderGroup,
   renderQuota,
   stringToColor,
   getLogOther,
   renderModelTag,
+  renderClaudeLogContent,
+  renderLogContent,
   renderModelPriceSimple,
+  renderAudioModelPrice,
+  renderClaudeModelPrice,
+  renderModelPrice,
 } from '../../../helpers';
 import { IconHelpCircle } from '@douyinfe/semi-icons';
 import { CircleAlert, Route, Sparkles } from 'lucide-react';
@@ -369,142 +376,6 @@ function getPromptCacheSummary(other) {
   };
 }
 
-function normalizeDetailText(detail) {
-  return String(detail || '')
-    .replace(/\n\r/g, '\n')
-    .replace(/\r\n/g, '\n');
-}
-
-function getUsageLogGroupSummary(groupRatio, userGroupRatio, t) {
-  const parsedUserGroupRatio = Number(userGroupRatio);
-  const useUserGroupRatio =
-    Number.isFinite(parsedUserGroupRatio) && parsedUserGroupRatio !== -1;
-  const ratio = useUserGroupRatio ? userGroupRatio : groupRatio;
-  if (ratio === undefined || ratio === null || ratio === '') {
-    return '';
-  }
-  return `${useUserGroupRatio ? t('专属倍率') : t('分组')} ${formatRatio(ratio)}x`;
-}
-
-function renderCompactDetailSummary(summarySegments) {
-  const segments = Array.isArray(summarySegments)
-    ? summarySegments.filter((segment) => segment?.text)
-    : [];
-  if (!segments.length) {
-    return null;
-  }
-
-  return (
-    <div
-      style={{
-        maxWidth: 180,
-        lineHeight: 1.35,
-      }}
-    >
-      {segments.map((segment, index) => (
-        <Typography.Text
-          key={`${segment.text}-${index}`}
-          type={segment.tone === 'secondary' ? 'tertiary' : undefined}
-          size={segment.tone === 'secondary' ? 'small' : undefined}
-          style={{
-            display: 'block',
-            maxWidth: '100%',
-            fontSize: 12,
-            marginTop: index === 0 ? 0 : 2,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {segment.text}
-        </Typography.Text>
-      ))}
-    </div>
-  );
-}
-
-function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
-  const other = getLogOther(record.other);
-
-  if (record.type === 6) {
-    return {
-      segments: [{ text: t('异步任务退款'), tone: 'primary' }],
-    };
-  }
-
-  if (other == null || record.type !== 2) {
-    return null;
-  }
-
-  if (
-    other?.violation_fee === true ||
-    Boolean(other?.violation_fee_code) ||
-    Boolean(other?.violation_fee_marker)
-  ) {
-    const feeQuota = other?.fee_quota ?? record?.quota;
-    const groupText = getUsageLogGroupSummary(
-      other?.group_ratio,
-      other?.user_group_ratio,
-      t,
-    );
-    return {
-      segments: [
-        groupText ? { text: groupText, tone: 'primary' } : null,
-        { text: t('违规扣费'), tone: 'primary' },
-        {
-          text: `${t('扣费')}：${renderQuota(feeQuota, 6)}`,
-          tone: 'secondary',
-        },
-        text ? { text: `${t('详情')}：${text}`, tone: 'secondary' } : null,
-      ].filter(Boolean),
-    };
-  }
-
-  return {
-    segments: other?.claude
-      ? renderModelPriceSimple(
-          other.model_ratio,
-          other.model_price,
-          other.group_ratio,
-          other?.user_group_ratio,
-          other.cache_tokens || 0,
-          other.cache_ratio || 1.0,
-          other.cache_creation_tokens || 0,
-          other.cache_creation_ratio || 1.0,
-          other.cache_creation_tokens_5m || 0,
-          other.cache_creation_ratio_5m || other.cache_creation_ratio || 1.0,
-          other.cache_creation_tokens_1h || 0,
-          other.cache_creation_ratio_1h || other.cache_creation_ratio || 1.0,
-          false,
-          1.0,
-          other?.is_system_prompt_overwritten,
-          'claude',
-          billingDisplayMode,
-          'segments',
-        )
-      : renderModelPriceSimple(
-          other.model_ratio,
-          other.model_price,
-          other.group_ratio,
-          other?.user_group_ratio,
-          other.cache_tokens || 0,
-          other.cache_ratio || 1.0,
-          0,
-          1.0,
-          0,
-          1.0,
-          0,
-          1.0,
-          false,
-          1.0,
-          other?.is_system_prompt_overwritten,
-          'openai',
-          billingDisplayMode,
-          'segments',
-        ),
-  };
-}
-
 export const getLogsColumns = ({
   t,
   COLUMN_KEYS,
@@ -512,7 +383,6 @@ export const getLogsColumns = ({
   showUserInfoFunc,
   openChannelAffinityUsageCacheModal,
   isAdminUser,
-  billingDisplayMode = 'price',
 }) => {
   return [
     {
@@ -525,12 +395,43 @@ export const getLogsColumns = ({
       title: t('渠道'),
       dataIndex: 'channel',
       render: (text, record, index) => {
+        if (
+          !(
+            record.type === 0 ||
+            record.type === 2 ||
+            record.type === 5 ||
+            record.type === 6
+          )
+        ) {
+          return <></>;
+        }
+
+        const other = getLogOther(record.other);
+        const baseUrlIndexRaw =
+          other?.base_url_index ?? other?.admin_info?.base_url_index;
+        const baseUrlIdRaw = other?.base_url_id ?? other?.admin_info?.base_url_id;
+        const baseUrlIndex =
+          baseUrlIndexRaw === undefined ||
+          baseUrlIndexRaw === null ||
+          baseUrlIndexRaw === ''
+            ? null
+            : baseUrlIndexRaw;
+        const baseUrlId =
+          baseUrlIdRaw === undefined || baseUrlIdRaw === null || baseUrlIdRaw === ''
+            ? null
+            : baseUrlIdRaw;
+
+        const channelId = record.channel ?? text;
+        const displayChannel =
+          baseUrlIndex === null ? `${channelId}` : `${channelId}-${baseUrlIndex}`;
+
         let isMultiKey = false;
         let multiKeyIndex = -1;
         let content = t('渠道') + `：${record.channel}`;
         let affinity = null;
         let showMarker = false;
-        let other = getLogOther(record.other);
+        let adminBaseUrl = null;
+
         if (other?.admin_info) {
           let adminInfo = other.admin_info;
           if (adminInfo?.is_multi_key) {
@@ -547,26 +448,42 @@ export const getLogsColumns = ({
             affinity = adminInfo.channel_affinity;
             showMarker = true;
           }
+          adminBaseUrl = adminInfo.base_url || null;
         }
 
-        return isAdminUser &&
-          (record.type === 0 ||
-            record.type === 2 ||
-            record.type === 5 ||
-            record.type === 6) ? (
+        const baseUrlIndexText = baseUrlIndex === null ? '-' : baseUrlIndex;
+        const baseUrlIdText = baseUrlId === null ? '-' : baseUrlId;
+
+        const tooltipContent = isAdminUser ? (
+          <div style={{ lineHeight: 1.6 }}>
+            <div>{record.channel_name || t('未知渠道')}</div>
+            <div>base_url_index：{baseUrlIndexText}</div>
+            <div>base_url_id：{baseUrlIdText}</div>
+            {adminBaseUrl ? (
+              <div style={{ wordBreak: 'break-all' }}>base_url：{adminBaseUrl}</div>
+            ) : null}
+          </div>
+        ) : (
+          <div style={{ lineHeight: 1.6 }}>
+            <div>base_url_index：{baseUrlIndexText}</div>
+            <div>base_url_id：{baseUrlIdText}</div>
+          </div>
+        );
+
+        return (
           <Space>
             <span style={{ position: 'relative', display: 'inline-block' }}>
-              <Tooltip content={record.channel_name || t('未知渠道')}>
+              <Tooltip content={tooltipContent}>
                 <span>
                   <Tag
                     color={colors[parseInt(text) % colors.length]}
                     shape='circle'
                   >
-                    {text}
+                    {displayChannel}
                   </Tag>
                 </span>
               </Tooltip>
-              {showMarker && (
+              {isAdminUser && showMarker && (
                 <Tooltip
                   content={
                     <div style={{ lineHeight: 1.6 }}>
@@ -605,13 +522,13 @@ export const getLogsColumns = ({
                 </Tooltip>
               )}
             </span>
-            {isMultiKey && (
+            {isAdminUser && isMultiKey && (
               <Tag color='white' shape='circle'>
                 {multiKeyIndex}
               </Tag>
             )}
           </Space>
-        ) : null;
+        );
       },
     },
     {
@@ -644,10 +561,7 @@ export const getLogsColumns = ({
       title: t('令牌'),
       dataIndex: 'token_name',
       render: (text, record, index) => {
-        return record.type === 0 ||
-          record.type === 2 ||
-          record.type === 5 ||
-          record.type === 6 ? (
+        return record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6 ? (
           <div>
             <Tag
               color='grey'
@@ -670,12 +584,7 @@ export const getLogsColumns = ({
       title: t('分组'),
       dataIndex: 'group',
       render: (text, record, index) => {
-        if (
-          record.type === 0 ||
-          record.type === 2 ||
-          record.type === 5 ||
-          record.type === 6
-        ) {
+        if (record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6) {
           if (record.group) {
             return <>{renderGroup(record.group)}</>;
           } else {
@@ -715,10 +624,7 @@ export const getLogsColumns = ({
       title: t('模型'),
       dataIndex: 'model_name',
       render: (text, record, index) => {
-        return record.type === 0 ||
-          record.type === 2 ||
-          record.type === 5 ||
-          record.type === 6 ? (
+        return record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6 ? (
           <>{renderModelName(record, copyText, t)}</>
         ) : (
           <></>
@@ -785,10 +691,7 @@ export const getLogsColumns = ({
           cacheText = `${t('缓存写')} ${formatTokenCount(cacheSummary.cacheWriteTokens)}`;
         }
 
-        return record.type === 0 ||
-          record.type === 2 ||
-          record.type === 5 ||
-          record.type === 6 ? (
+        return record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6 ? (
           <div
             style={{
               display: 'inline-flex',
@@ -822,10 +725,7 @@ export const getLogsColumns = ({
       dataIndex: 'completion_tokens',
       render: (text, record, index) => {
         return parseInt(text) > 0 &&
-          (record.type === 0 ||
-            record.type === 2 ||
-            record.type === 5 ||
-            record.type === 6) ? (
+          (record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6) ? (
           <>{<span> {text} </span>}</>
         ) : (
           <></>
@@ -837,14 +737,7 @@ export const getLogsColumns = ({
       title: t('花费'),
       dataIndex: 'quota',
       render: (text, record, index) => {
-        if (
-          !(
-            record.type === 0 ||
-            record.type === 2 ||
-            record.type === 5 ||
-            record.type === 6
-          )
-        ) {
+        if (!(record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6)) {
           return <></>;
         }
         const other = getLogOther(record.other);
@@ -911,9 +804,9 @@ export const getLogsColumns = ({
           }
           if (other.admin_info !== undefined) {
             if (
-              other.admin_info.use_channel !== null &&
-              other.admin_info.use_channel !== undefined &&
-              other.admin_info.use_channel !== ''
+                other.admin_info.use_channel !== null &&
+                other.admin_info.use_channel !== undefined &&
+                other.admin_info.use_channel !== ''
             ) {
               let useChannel = other.admin_info.use_channel;
               let useChannelStr = useChannel.join('->');
@@ -929,16 +822,19 @@ export const getLogsColumns = ({
       title: t('详情'),
       dataIndex: 'content',
       fixed: 'right',
-      width: 200,
       render: (text, record, index) => {
-        const detailSummary = getUsageLogDetailSummary(
-          record,
-          text,
-          billingDisplayMode,
-          t,
-        );
-
-        if (!detailSummary) {
+        let other = getLogOther(record.other);
+        if (record.type === 6) {
+          return (
+            <Typography.Paragraph
+              ellipsis={{ rows: 2 }}
+              style={{ maxWidth: 240 }}
+            >
+              {t('异步任务退款')}
+            </Typography.Paragraph>
+          );
+        }
+        if (other == null || record.type !== 2) {
           return (
             <Typography.Paragraph
               ellipsis={{
@@ -948,14 +844,95 @@ export const getLogsColumns = ({
                   opts: { style: { width: 240 } },
                 },
               }}
-              style={{ maxWidth: 200, marginBottom: 0 }}
+              style={{ maxWidth: 240 }}
             >
               {text}
             </Typography.Paragraph>
           );
         }
 
-        return renderCompactDetailSummary(detailSummary.segments);
+        if (
+          other?.violation_fee === true ||
+          Boolean(other?.violation_fee_code) ||
+          Boolean(other?.violation_fee_marker)
+        ) {
+          const feeQuota = other?.fee_quota ?? record?.quota;
+          const ratioText = formatRatio(other?.group_ratio);
+          const summary = [
+            t('违规扣费'),
+            `${t('分组倍率')}：${ratioText}`,
+            `${t('扣费')}：${renderQuota(feeQuota, 6)}`,
+            text ? `${t('详情')}：${text}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n');
+          return (
+            <Typography.Paragraph
+              ellipsis={{
+                rows: 2,
+                showTooltip: {
+                  type: 'popover',
+                  opts: { style: { width: 240 } },
+                },
+              }}
+              style={{ maxWidth: 240, whiteSpace: 'pre-line' }}
+            >
+              {summary}
+            </Typography.Paragraph>
+          );
+        }
+
+        let content = other?.claude
+          ? renderModelPriceSimple(
+              other.model_ratio,
+              other.model_price,
+              other.group_ratio,
+              other?.user_group_ratio,
+              other.cache_tokens || 0,
+              other.cache_ratio || 1.0,
+              other.cache_creation_tokens || 0,
+              other.cache_creation_ratio || 1.0,
+              other.cache_creation_tokens_5m || 0,
+              other.cache_creation_ratio_5m ||
+                other.cache_creation_ratio ||
+                1.0,
+              other.cache_creation_tokens_1h || 0,
+              other.cache_creation_ratio_1h ||
+                other.cache_creation_ratio ||
+                1.0,
+              false,
+              1.0,
+              other?.is_system_prompt_overwritten,
+              'claude',
+            )
+          : renderModelPriceSimple(
+              other.model_ratio,
+              other.model_price,
+              other.group_ratio,
+              other?.user_group_ratio,
+              other.cache_tokens || 0,
+              other.cache_ratio || 1.0,
+              0,
+              1.0,
+              0,
+              1.0,
+              0,
+              1.0,
+              false,
+              1.0,
+              other?.is_system_prompt_overwritten,
+              'openai',
+            );
+        return (
+            <Typography.Paragraph
+                ellipsis={{
+                  rows: 3,
+                }}
+                style={{ maxWidth: 240, whiteSpace: 'pre-line' }}
+            >
+              {content}
+            </Typography.Paragraph>
+        );
       },
     },
   ];

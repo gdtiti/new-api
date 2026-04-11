@@ -266,6 +266,17 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 		}
 		if userQuota <= 0 {
+			autoDisabled, disableErr := model.DisableTemporaryUserAndDefaultToken(relayInfo.UserId)
+			if disableErr != nil {
+				return nil, types.NewError(disableErr, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+			}
+			if autoDisabled {
+				common.SysLog(fmt.Sprintf("temporary user %d disabled automatically because quota is exhausted", relayInfo.UserId))
+				return nil, types.NewErrorWithStatusCode(
+					fmt.Errorf("临时账号额度不足，已自动禁用"),
+					types.ErrorCodeUpdateDataError, http.StatusForbidden,
+					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
 			return nil, types.NewErrorWithStatusCode(
 				fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,

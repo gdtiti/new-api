@@ -98,10 +98,12 @@ const resolveRateLimitWindows = (data) => {
   }
 
   if (!fiveHourWindow) {
-    fiveHourWindow = windows.find((windowData) => windowData !== weeklyWindow) ?? null;
+    fiveHourWindow =
+      windows.find((windowData) => windowData !== weeklyWindow) ?? null;
   }
   if (!weeklyWindow) {
-    weeklyWindow = windows.find((windowData) => windowData !== fiveHourWindow) ?? null;
+    weeklyWindow =
+      windows.find((windowData) => windowData !== fiveHourWindow) ?? null;
   }
 
   return { fiveHourWindow, weeklyWindow };

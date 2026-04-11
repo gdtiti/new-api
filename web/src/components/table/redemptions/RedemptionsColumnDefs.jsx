@@ -22,6 +22,8 @@ import { Tag, Button, Space, Popover, Dropdown } from '@douyinfe/semi-ui';
 import { IconMore } from '@douyinfe/semi-icons';
 import { renderQuota, timestamp2string } from '../../../helpers';
 import {
+  REDEMPTION_GRANT_TYPE,
+  REDEMPTION_GRANT_TYPE_MAP,
   REDEMPTION_STATUS,
   REDEMPTION_STATUS_MAP,
   REDEMPTION_ACTIONS,
@@ -73,6 +75,19 @@ const renderStatus = (status, record, t) => {
   );
 };
 
+const renderGrantType = (grantType, t) => {
+  const normalizedGrantType =
+    grantType === REDEMPTION_GRANT_TYPE.SUBSCRIPTION
+      ? REDEMPTION_GRANT_TYPE.SUBSCRIPTION
+      : REDEMPTION_GRANT_TYPE.QUOTA;
+  const config = REDEMPTION_GRANT_TYPE_MAP[normalizedGrantType];
+  return (
+    <Tag color={config.color} shape='circle'>
+      {t(config.text)}
+    </Tag>
+  );
+};
+
 /**
  * Get redemption code table column definitions
  */
@@ -105,15 +120,60 @@ export const getRedemptionsColumns = ({
       },
     },
     {
+      title: t('发放类型'),
+      dataIndex: 'grant_type',
+      render: (text) => {
+        return <div>{renderGrantType(text, t)}</div>;
+      },
+    },
+    {
       title: t('额度'),
       dataIndex: 'quota',
-      render: (text) => {
+      render: (text, record) => {
+        if (record.grant_type === REDEMPTION_GRANT_TYPE.SUBSCRIPTION) {
+          return <div>{t('不适用')}</div>;
+        }
         return (
           <div>
             <Tag color='grey' shape='circle'>
               {renderQuota(parseInt(text))}
             </Tag>
           </div>
+        );
+      },
+    },
+    {
+      title: t('订阅套餐'),
+      dataIndex: 'subscription_plan_title',
+      render: (text, record) => {
+        if (record.grant_type !== REDEMPTION_GRANT_TYPE.SUBSCRIPTION) {
+          return <div>{t('无')}</div>;
+        }
+        return (
+          <div>
+            <Tag color='blue' shape='circle'>
+              {text || `#${record.subscription_plan_id}`}
+            </Tag>
+          </div>
+        );
+      },
+    },
+    {
+      title: t('兑换次数'),
+      dataIndex: 'redeemed_count',
+      render: (text, record) => {
+        const redeemedCount = Number(text || 0);
+        const maxRedeemCount = Number(record.max_redeem_count || 1);
+        const color =
+          redeemedCount >= maxRedeemCount
+            ? 'grey'
+            : redeemedCount > 0
+              ? 'blue'
+              : 'green';
+        return (
+          <Tag color={color} shape='circle'>
+            {`${redeemedCount}/${maxRedeemCount}`}
+          </Tag>
         );
       },
     },

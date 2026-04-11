@@ -9,6 +9,9 @@ import (
 )
 
 func cacheSetToken(token Token) error {
+	if !common.RedisEnabled {
+		return nil
+	}
 	key := common.GenerateHMAC(token.Key)
 	token.Clean()
 	err := common.RedisHSetObj(fmt.Sprintf("token:%s", key), &token, time.Duration(common.RedisKeyCacheSeconds())*time.Second)
@@ -19,6 +22,9 @@ func cacheSetToken(token Token) error {
 }
 
 func cacheDeleteToken(key string) error {
+	if !common.RedisEnabled {
+		return nil
+	}
 	key = common.GenerateHMAC(key)
 	err := common.RedisDelKey(fmt.Sprintf("token:%s", key))
 	if err != nil {
@@ -28,6 +34,9 @@ func cacheDeleteToken(key string) error {
 }
 
 func cacheIncrTokenQuota(key string, increment int64) error {
+	if !common.RedisEnabled {
+		return nil
+	}
 	key = common.GenerateHMAC(key)
 	err := common.RedisHIncrBy(fmt.Sprintf("token:%s", key), constant.TokenFiledRemainQuota, increment)
 	if err != nil {
@@ -41,6 +50,9 @@ func cacheDecrTokenQuota(key string, decrement int64) error {
 }
 
 func cacheSetTokenField(key string, field string, value string) error {
+	if !common.RedisEnabled {
+		return nil
+	}
 	key = common.GenerateHMAC(key)
 	err := common.RedisHSetField(fmt.Sprintf("token:%s", key), field, value)
 	if err != nil {

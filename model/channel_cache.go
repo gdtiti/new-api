@@ -17,6 +17,9 @@ import (
 var group2model2channels map[string]map[string][]int // enabled channel
 var channelsIDM map[int]*Channel                     // all channels include disabled
 var channelSyncLock sync.RWMutex
+var channelBaseURLsIDM map[int][]*ChannelBaseURL // per-channel base_urls (sorted by sort_order asc, id asc)
+
+type ChannelFilter func(channel *Channel) bool
 
 func InitChannelCache() {
 	if !common.MemoryCacheEnabled {
@@ -27,6 +30,31 @@ func InitChannelCache() {
 	DB.Find(&channels)
 	for _, channel := range channels {
 		newChannelId2channel[channel.Id] = channel
+	}
+
+	newChannelBaseURLsIDM := make(map[int][]*ChannelBaseURL)
+	var baseURLs []*ChannelBaseURL
+	if err := EnsureChannelBaseURLSchema(); err != nil {
+		common.SysError(fmt.Sprintf("failed to ensure channel base url schema: err=%v", err))
+	} else if err := DB.Find(&baseURLs).Error; err != nil {
+		common.SysError(fmt.Sprintf("failed to load channel base urls: err=%v", err))
+	} else {
+		for _, b := range baseURLs {
+			if b == nil || b.ChannelId <= 0 {
+				continue
+			}
+			newChannelBaseURLsIDM[b.ChannelId] = append(newChannelBaseURLsIDM[b.ChannelId], b)
+		}
+		for channelID := range newChannelBaseURLsIDM {
+			list := newChannelBaseURLsIDM[channelID]
+			sort.Slice(list, func(i, j int) bool {
+				if list[i].SortOrder != list[j].SortOrder {
+					return list[i].SortOrder < list[j].SortOrder
+				}
+				return list[i].Id < list[j].Id
+			})
+			newChannelBaseURLsIDM[channelID] = list
+		}
 	}
 	var abilities []*Ability
 	DB.Find(&abilities)
@@ -81,6 +109,7 @@ func InitChannelCache() {
 		}
 	}
 	channelsIDM = newChannelId2channel
+	channelBaseURLsIDM = newChannelBaseURLsIDM
 	channelSyncLock.Unlock()
 	common.SysLog("channels synced from database")
 }
@@ -94,27 +123,57 @@ func SyncChannelCache(frequency int) {
 }
 
 func GetRandomSatisfiedChannel(group string, model string, retry int) (*Channel, error) {
+	return GetRandomSatisfiedChannelWithFilter(group, model, retry, nil)
+}
+
+func GetRandomSatisfiedChannelWithFilter(group string, model string, retry int, channelFilter ChannelFilter) (*Channel, error) {
 	// if memory cache is disabled, get channel directly from database
 	if !common.MemoryCacheEnabled {
-		return GetChannel(group, model, retry)
+		return GetChannelWithFilter(group, model, retry, channelFilter)
 	}
 
 	channelSyncLock.RLock()
 	defer channelSyncLock.RUnlock()
 
-	// First, try to find channels with the exact model name.
-	channels := group2model2channels[group][model]
-
-	// If no channels found, try to find channels with the normalized model name.
-	if len(channels) == 0 {
-		normalizedModel := ratio_setting.FormatMatchingModelName(model)
-		channels = group2model2channels[group][normalizedModel]
-	}
-
+	channels := getCandidateChannelsForModel(group, model, channelFilter)
 	if len(channels) == 0 {
 		return nil, nil
 	}
 
+	return selectRandomChannelFromIDs(channels, retry)
+}
+
+func getCandidateChannelsForModel(group string, model string, channelFilter ChannelFilter) []int {
+	exactChannels := filterChannelIDsByPredicate(group2model2channels[group][model], channelFilter)
+	if len(exactChannels) > 0 {
+		return exactChannels
+	}
+
+	normalizedModel := ratio_setting.FormatMatchingModelName(model)
+	if normalizedModel == "" || normalizedModel == model {
+		return nil
+	}
+	return filterChannelIDsByPredicate(group2model2channels[group][normalizedModel], channelFilter)
+}
+
+func filterChannelIDsByPredicate(channelIDs []int, channelFilter ChannelFilter) []int {
+	if len(channelIDs) == 0 {
+		return nil
+	}
+	if channelFilter == nil {
+		return channelIDs
+	}
+	filtered := make([]int, 0, len(channelIDs))
+	for _, channelID := range channelIDs {
+		channel, ok := channelsIDM[channelID]
+		if !ok || channelFilter(channel) {
+			filtered = append(filtered, channelID)
+		}
+	}
+	return filtered
+}
+
+func selectRandomChannelFromIDs(channels []int, retry int) (*Channel, error) {
 	if len(channels) == 1 {
 		if channel, ok := channelsIDM[channels[0]]; ok {
 			return channel, nil
@@ -156,7 +215,7 @@ func GetRandomSatisfiedChannel(group string, model string, retry int) (*Channel,
 	}
 
 	if len(targetChannels) == 0 {
-		return nil, errors.New(fmt.Sprintf("no channel found, group: %s, model: %s, priority: %d", group, model, targetPriority))
+		return nil, fmt.Errorf("no channel found for target priority %d", targetPriority)
 	}
 
 	// smoothing factor and adjustment

@@ -35,7 +35,6 @@ import { API, showError, showSuccess } from '../../../helpers';
 import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
-
 export default function SettingsPaymentGatewayWaffo(props) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);

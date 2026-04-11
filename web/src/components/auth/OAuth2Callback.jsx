@@ -22,6 +22,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   API,
+  resolvePostLoginTarget,
   showError,
   showSuccess,
   updateAPI,
@@ -65,7 +66,7 @@ const OAuth2Callback = (props) => {
         setUserData(data);
         updateAPI();
         showSuccess(t('登录成功！'));
-        navigate('/console/token');
+        navigate(resolvePostLoginTarget(data));
       }
     } catch (error) {
       // 网络错误等可重试

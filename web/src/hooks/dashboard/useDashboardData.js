@@ -20,7 +20,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { API, isAdmin, showError, timestamp2string } from '../../helpers';
+import {
+  API,
+  isAdmin,
+  showError,
+  timestamp2string,
+  toLocalUnixTimestamp,
+} from '../../helpers';
 import { getDefaultTime, getInitialTimestamp } from '../../helpers/dashboard';
 import { TIME_OPTIONS } from '../../constants/dashboard.constants';
 import { useIsMobile } from '../common/useIsMobile';
@@ -108,7 +114,9 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const performanceMetrics = useMemo(() => {
     const { start_timestamp, end_timestamp } = inputs;
     const timeDiff =
-      (Date.parse(end_timestamp) - Date.parse(start_timestamp)) / 60000;
+      (toLocalUnixTimestamp(end_timestamp) -
+        toLocalUnixTimestamp(start_timestamp)) /
+      60;
     const avgRPM = isNaN(times / timeDiff)
       ? '0'
       : (times / timeDiff).toFixed(3);
@@ -161,8 +169,8 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     try {
       let url = '';
       const { start_timestamp, end_timestamp, username } = inputs;
-      let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-      let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+      let localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+      let localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
 
       if (isAdminUser) {
         url = `/api/data/?username=${username}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&default_time=${dataExportDefaultTime}`;

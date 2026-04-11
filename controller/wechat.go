@@ -22,6 +22,8 @@ type wechatLoginResponse struct {
 	Data    string `json:"data"`
 }
 
+var getWeChatIdByCodeFunc = getWeChatIdByCode
+
 func getWeChatIdByCode(code string) (string, error) {
 	if code == "" {
 		return "", errors.New("无效的参数")
@@ -62,7 +64,7 @@ func WeChatAuth(c *gin.Context) {
 		return
 	}
 	code := c.Query("code")
-	wechatId, err := getWeChatIdByCode(code)
+	wechatId, err := getWeChatIdByCodeFunc(code)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"message": err.Error(),
@@ -103,6 +105,7 @@ func WeChatAuth(c *gin.Context) {
 				})
 				return
 			}
+			model.GrantRegisterDefaultSubscriptionForUser(user.Id)
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,

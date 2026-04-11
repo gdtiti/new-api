@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@douyinfe/semi-ui';
 import {
@@ -61,9 +61,6 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
   // UI state
   const [compactMode, setCompactMode] = useTableCompactMode('tokens');
   const [showKeys, setShowKeys] = useState({});
-  const [resolvedTokenKeys, setResolvedTokenKeys] = useState({});
-  const [loadingTokenKeys, setLoadingTokenKeys] = useState({});
-  const keyRequestsRef = useRef({});
 
   // Form state
   const [formApi, setFormApi] = useState(null);
@@ -97,7 +94,6 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
     setTokenCount(payload.total || 0);
     setActivePage(payload.page || 1);
     setPageSize(payload.page_size || pageSize);
-    setShowKeys({});
   };
 
   // Load tokens function
@@ -213,13 +209,12 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
 
   // Open link function for chat integrations
   const onOpenLink = async (type, url, record) => {
-    const fullKey = await fetchTokenKey(record);
     if (url && url.startsWith('ccswitch')) {
-      openCCSwitchModal(fullKey);
+      openCCSwitchModal(record.key);
       return;
     }
     if (url && url.startsWith('fluent')) {
-      openFluentNotification(fullKey);
+      openFluentNotification(record.key);
       return;
     }
     let status = localStorage.getItem('status');
@@ -235,7 +230,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
       let cherryConfig = {
         id: 'new-api',
         baseUrl: serverAddress,
-        apiKey: `sk-${fullKey}`,
+        apiKey: 'sk-' + record.key,
       };
       let encodedConfig = encodeURIComponent(
         encodeToBase64(JSON.stringify(cherryConfig)),
@@ -245,7 +240,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
       let aionuiConfig = {
         platform: 'new-api',
         baseUrl: serverAddress,
-        apiKey: `sk-${fullKey}`,
+        apiKey: 'sk-' + record.key,
       };
       let encodedConfig = encodeURIComponent(
         encodeToBase64(JSON.stringify(aionuiConfig)),
@@ -254,7 +249,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
     } else {
       let encodedServerAddress = encodeURIComponent(serverAddress);
       url = url.replaceAll('{address}', encodedServerAddress);
-      url = url.replaceAll('{key}', `sk-${fullKey}`);
+      url = url.replaceAll('{key}', 'sk-' + record.key);
     }
 
     window.open(url, '_blank');
@@ -404,7 +399,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
   };
 
   // Batch copy tokens
-  const batchCopyTokens = async (copyType) => {
+  const batchCopyTokens = (copyType) => {
     if (selectedKeys.length === 0) {
       showError(t('请至少选择一个令牌！'));
       return;
@@ -477,8 +472,6 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
     setCompactMode,
     showKeys,
     setShowKeys,
-    resolvedTokenKeys,
-    loadingTokenKeys,
 
     // Form state
     formApi,

@@ -241,6 +241,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.GET("/tag/models", controller.GetTagModels)
 			channelRoute.POST("/copy/:id", controller.CopyChannel)
 			channelRoute.POST("/multi_key/manage", controller.ManageMultiKeys)
+			channelRoute.POST("/base_url/manage", controller.ManageChannelBaseURLs)
 			channelRoute.POST("/upstream_updates/apply", controller.ApplyChannelUpstreamModelUpdates)
 			channelRoute.POST("/upstream_updates/apply_all", controller.ApplyAllChannelUpstreamModelUpdates)
 			channelRoute.POST("/upstream_updates/detect", controller.DetectChannelUpstreamModelUpdates)
@@ -280,6 +281,12 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.PUT("/", controller.UpdateRedemption)
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
+		}
+		temporaryUserRoute := apiRouter.Group("/temporary-user")
+		{
+			temporaryUserRoute.POST("/", middleware.AdminAuth(), controller.CreateTemporaryUser)
+			temporaryUserRoute.GET("/", middleware.RootAuth(), controller.GetTemporaryUsers)
+			temporaryUserRoute.POST("/manage", middleware.RootAuth(), controller.ManageTemporaryUser)
 		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)

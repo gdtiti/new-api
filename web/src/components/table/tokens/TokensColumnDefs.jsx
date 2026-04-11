@@ -130,18 +130,12 @@ const renderTokenKey = (
   t,
 ) => {
   const revealed = !!showKeys[record.id];
-  const loading = !!loadingTokenKeys[record.id];
-  const keyValue =
-    revealed && resolvedTokenKeys[record.id]
-      ? resolvedTokenKeys[record.id]
-      : record.key || '';
-  const displayedKey = keyValue ? `sk-${keyValue}` : '';
 
   return (
     <div className='w-[200px]'>
       <Input
         readOnly
-        value={displayedKey}
+        value={revealed ? fullKey : maskedKey}
         size='small'
         suffix={
           <div className='flex items-center'>
@@ -150,11 +144,10 @@ const renderTokenKey = (
               size='small'
               type='tertiary'
               icon={revealed ? <IconEyeClosed /> : <IconEyeOpened />}
-              loading={loading}
               aria-label='toggle token visibility'
-              onClick={async (e) => {
+              onClick={(e) => {
                 e.stopPropagation();
-                await toggleTokenVisibility(record);
+                setShowKeys((prev) => ({ ...prev, [record.id]: !revealed }));
               }}
             />
             <Dropdown

@@ -155,6 +155,17 @@ func WssError(c *gin.Context, ws *websocket.Conn, openaiError types.OpenAIError)
 	_ = WssObject(c, ws, errorObj)
 }
 
+func WssOpenAIError(c *gin.Context, ws *websocket.Conn, openaiError types.OpenAIError) {
+	if ws == nil {
+		return
+	}
+	errorObj := map[string]any{
+		"type":  "error",
+		"error": openaiError,
+	}
+	_ = WssObject(c, ws, errorObj)
+}
+
 func GetResponseID(c *gin.Context) string {
 	logID := c.GetString(common.RequestIdKey)
 	return fmt.Sprintf("chatcmpl-%s", logID)

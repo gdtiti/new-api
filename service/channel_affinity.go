@@ -790,6 +790,21 @@ func GetChannelAffinityUsageCacheStats(ruleName, usingGroup, keyFp string) Chann
 	}
 }
 
+func clearChannelAffinityUsageCacheStatsAll() int {
+	cache := getChannelAffinityUsageCacheStatsCache()
+	keys, err := cache.Keys()
+	if err != nil {
+		common.SysError(fmt.Sprintf("channel affinity usage cache stats list keys failed: err=%v", err))
+		keys = nil
+	}
+	if len(keys) > 0 {
+		if _, err := cache.DeleteMany(keys); err != nil {
+			common.SysError(fmt.Sprintf("channel affinity usage cache stats delete many failed: err=%v", err))
+		}
+	}
+	return len(keys)
+}
+
 func observeChannelAffinityUsageCache(statsCtx ChannelAffinityStatsContext, usage *dto.Usage, cachedTokenRateMode string) {
 	entryKey := channelAffinityUsageCacheEntryKey(statsCtx.RuleName, statsCtx.UsingGroup, statsCtx.KeyFingerprint)
 	if entryKey == "" {

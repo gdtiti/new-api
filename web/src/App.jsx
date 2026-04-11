@@ -18,7 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { lazy, Suspense, useContext, useMemo } from 'react';
-import { Route, Routes, useLocation, useParams } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from 'react-router-dom';
 import Loading from './components/common/ui/Loading';
 import User from './pages/User';
 import { AuthRedirect, PrivateRoute, AdminRoute } from './helpers';
@@ -55,6 +61,23 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const About = lazy(() => import('./pages/About'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const PortalShell = lazy(() => import('./components/portal/PortalShell'));
+const PortalOverviewPage = lazy(
+  () => import('./components/portal/PortalOverviewPage'),
+);
+const PortalAnalyticsPage = lazy(
+  () => import('./components/portal/PortalAnalyticsPage'),
+);
+const PortalWalletPage = lazy(
+  () => import('./components/portal/PortalWalletPage'),
+);
+const PortalSubscriptionPage = lazy(
+  () => import('./components/portal/PortalSubscriptionPage'),
+);
+const PortalLogsPage = lazy(() => import('./components/portal/PortalLogsPage'));
+const PortalModelGalleryPage = lazy(
+  () => import('./components/portal/PortalModelGalleryPage'),
+);
 
 function DynamicOAuth2Callback() {
   const { provider } = useParams();
@@ -267,6 +290,74 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path='/app'
+          element={
+            <PrivateRoute>
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalShell />
+              </Suspense>
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to='overview' replace />} />
+          <Route
+            path='overview'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalOverviewPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='analytics'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalAnalyticsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='wallet'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalWalletPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='subscription'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalSubscriptionPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='logs'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalLogsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='models'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalModelGalleryPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='account'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PersonalSetting />
+              </Suspense>
+            }
+          />
+        </Route>
         <Route
           path='/console/topup'
           element={

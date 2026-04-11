@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React from 'react';
 import { SideSheet, Typography, Button } from '@douyinfe/semi-ui';
-import { IconClose } from '@douyinfe/semi-icons';
+import { IconArrowRight, IconClose } from '@douyinfe/semi-icons';
 
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import ModelHeader from './components/ModelHeader';
@@ -33,9 +33,9 @@ const ModelDetailSideSheet = ({
   visible,
   onClose,
   modelData,
+  onViewLogs,
   groupRatio,
   currency,
-  siteDisplayType,
   tokenUnit,
   displayPrice,
   showRatio,
@@ -79,6 +79,16 @@ const ModelDetailSideSheet = ({
         )}
         {modelData && (
           <>
+            <div className='px-2 pt-2'>
+              <Button
+                theme='light'
+                type='primary'
+                icon={<IconArrowRight />}
+                onClick={() => onViewLogs?.(modelData.model_name)}
+              >
+                {t('查看相关日志')}
+              </Button>
+            </div>
             <ModelBasicInfo
               modelData={modelData}
               vendorsMap={vendorsMap}
@@ -93,7 +103,6 @@ const ModelDetailSideSheet = ({
               modelData={modelData}
               groupRatio={groupRatio}
               currency={currency}
-              siteDisplayType={siteDisplayType}
               tokenUnit={tokenUnit}
               displayPrice={displayPrice}
               showRatio={showRatio}

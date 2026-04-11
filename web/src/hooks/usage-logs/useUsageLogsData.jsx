@@ -17,8 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@douyinfe/semi-ui';
 import {
   API,
@@ -44,6 +45,8 @@ import ParamOverrideEntry from '../../components/table/usage-logs/components/Par
 
 export const useLogsData = () => {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const appliedSearchRef = useRef('');
 
   // Define column keys for selection
   const COLUMN_KEYS = {
@@ -80,9 +83,8 @@ export const useLogsData = () => {
   const STORAGE_KEY = isAdminUser
     ? 'logs-table-columns-admin'
     : 'logs-table-columns-user';
-  const BILLING_DISPLAY_MODE_STORAGE_KEY = isAdminUser
-    ? 'logs-billing-display-mode-admin'
-    : 'logs-billing-display-mode-user';
+  const NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY =
+    'logs-table-columns-user-channel-visible-v1';
 
   // Statistics state
   const [stat, setStat] = useState({
@@ -92,82 +94,29 @@ export const useLogsData = () => {
 
   // Form state
   const [formApi, setFormApi] = useState(null);
-  let now = new Date();
-  const formInitValues = {
-    username: '',
-    token_name: '',
-    model_name: '',
-    channel: '',
-    group: '',
-    request_id: '',
-    dateRange: [
-      timestamp2string(getTodayStartTimestamp()),
-      timestamp2string(now.getTime() / 1000 + 3600),
-    ],
-    logType: '0',
-  };
+  const formInitValues = useMemo(() => {
+    const startTimestamp =
+      searchParams.get('start_timestamp') ||
+      timestamp2string(getTodayStartTimestamp());
+    const endTimestamp =
+      searchParams.get('end_timestamp') ||
+      timestamp2string(Math.floor(Date.now() / 1000) + 3600);
 
-  // Get default column visibility based on user role
-  const getDefaultColumnVisibility = () => {
     return {
-      [COLUMN_KEYS.TIME]: true,
-      [COLUMN_KEYS.CHANNEL]: isAdminUser,
-      [COLUMN_KEYS.USERNAME]: isAdminUser,
-      [COLUMN_KEYS.TOKEN]: true,
-      [COLUMN_KEYS.GROUP]: true,
-      [COLUMN_KEYS.TYPE]: true,
-      [COLUMN_KEYS.MODEL]: true,
-      [COLUMN_KEYS.USE_TIME]: true,
-      [COLUMN_KEYS.PROMPT]: true,
-      [COLUMN_KEYS.COMPLETION]: true,
-      [COLUMN_KEYS.COST]: true,
-      [COLUMN_KEYS.RETRY]: isAdminUser,
-      [COLUMN_KEYS.IP]: true,
-      [COLUMN_KEYS.DETAILS]: true,
+      username: '',
+      token_name: searchParams.get('token_name') || '',
+      model_name: searchParams.get('model_name') || '',
+      channel: '',
+      group: searchParams.get('group') || '',
+      request_id: searchParams.get('request_id') || '',
+      dateRange: [startTimestamp, endTimestamp],
+      logType: searchParams.get('logType') || '0',
     };
-  };
-
-  const getInitialVisibleColumns = () => {
-    const defaults = getDefaultColumnVisibility();
-    const savedColumns = localStorage.getItem(STORAGE_KEY);
-
-    if (!savedColumns) {
-      return defaults;
-    }
-
-    try {
-      const parsed = JSON.parse(savedColumns);
-      const merged = { ...defaults, ...parsed };
-
-      if (!isAdminUser) {
-        merged[COLUMN_KEYS.CHANNEL] = false;
-        merged[COLUMN_KEYS.USERNAME] = false;
-        merged[COLUMN_KEYS.RETRY] = false;
-      }
-
-      return merged;
-    } catch (e) {
-      console.error('Failed to parse saved column preferences', e);
-      return defaults;
-    }
-  };
-
-  const getInitialBillingDisplayMode = () => {
-    const savedMode = localStorage.getItem(BILLING_DISPLAY_MODE_STORAGE_KEY);
-    if (savedMode === 'price' || savedMode === 'ratio') {
-      return savedMode;
-    }
-    return localStorage.getItem('quota_display_type') === 'TOKENS'
-      ? 'ratio'
-      : 'price';
-  };
+  }, [searchParams]);
 
   // Column visibility state
-  const [visibleColumns, setVisibleColumns] = useState(getInitialVisibleColumns);
+  const [visibleColumns, setVisibleColumns] = useState({});
   const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [billingDisplayMode, setBillingDisplayMode] = useState(
-    getInitialBillingDisplayMode,
-  );
 
   // Compact mode
   const [compactMode, setCompactMode] = useTableCompactMode('logs');
@@ -185,6 +134,59 @@ export const useLogsData = () => {
     useState(null);
   const [showParamOverrideModal, setShowParamOverrideModal] = useState(false);
   const [paramOverrideTarget, setParamOverrideTarget] = useState(null);
+
+  // Load saved column preferences from localStorage
+  useEffect(() => {
+    const savedColumns = localStorage.getItem(STORAGE_KEY);
+    if (savedColumns) {
+      try {
+        const parsed = JSON.parse(savedColumns);
+        const defaults = getDefaultColumnVisibility();
+        const merged = { ...defaults, ...parsed };
+
+        // For non-admin users, force-hide sensitive columns (does not touch admin settings)
+        if (!isAdminUser) {
+          merged[COLUMN_KEYS.USERNAME] = false;
+          merged[COLUMN_KEYS.RETRY] = false;
+
+          // Historical migration: channel column used to be forcibly hidden for non-admin users.
+          // Make it visible once by default, while still allowing users to hide it afterwards.
+          const migrated =
+            localStorage.getItem(NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY) === 'true';
+          if (!migrated) {
+            merged[COLUMN_KEYS.CHANNEL] = true;
+            localStorage.setItem(NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY, 'true');
+          }
+        }
+        setVisibleColumns(merged);
+      } catch (e) {
+        console.error('Failed to parse saved column preferences', e);
+        initDefaultColumns();
+      }
+    } else {
+      initDefaultColumns();
+    }
+  }, []);
+
+  // Get default column visibility based on user role
+  const getDefaultColumnVisibility = () => {
+    return {
+      [COLUMN_KEYS.TIME]: true,
+      [COLUMN_KEYS.CHANNEL]: true,
+      [COLUMN_KEYS.USERNAME]: isAdminUser,
+      [COLUMN_KEYS.TOKEN]: true,
+      [COLUMN_KEYS.GROUP]: true,
+      [COLUMN_KEYS.TYPE]: true,
+      [COLUMN_KEYS.MODEL]: true,
+      [COLUMN_KEYS.USE_TIME]: true,
+      [COLUMN_KEYS.PROMPT]: true,
+      [COLUMN_KEYS.COMPLETION]: true,
+      [COLUMN_KEYS.COST]: true,
+      [COLUMN_KEYS.RETRY]: isAdminUser,
+      [COLUMN_KEYS.IP]: true,
+      [COLUMN_KEYS.DETAILS]: true,
+    };
+  };
 
   // Initialize default column visibility
   const initDefaultColumns = () => {
@@ -206,9 +208,7 @@ export const useLogsData = () => {
 
     allKeys.forEach((key) => {
       if (
-        (key === COLUMN_KEYS.CHANNEL ||
-          key === COLUMN_KEYS.USERNAME ||
-          key === COLUMN_KEYS.RETRY) &&
+        (key === COLUMN_KEYS.USERNAME || key === COLUMN_KEYS.RETRY) &&
         !isAdminUser
       ) {
         updatedColumns[key] = false;
@@ -227,16 +227,12 @@ export const useLogsData = () => {
     }
   }, [visibleColumns]);
 
-  useEffect(() => {
-    localStorage.setItem(BILLING_DISPLAY_MODE_STORAGE_KEY, billingDisplayMode);
-  }, [BILLING_DISPLAY_MODE_STORAGE_KEY, billingDisplayMode]);
-
   // 获取表单值的辅助函数，确保所有值都是字符串
   const getFormValues = () => {
-    const formValues = formApi ? formApi.getValues() : {};
+    const formValues = formApi ? formApi.getValues() : formInitValues;
 
-    let start_timestamp = timestamp2string(getTodayStartTimestamp());
-    let end_timestamp = timestamp2string(now.getTime() / 1000 + 3600);
+    let start_timestamp = formInitValues.dateRange[0];
+    let end_timestamp = formInitValues.dateRange[1];
 
     if (
       formValues.dateRange &&
@@ -271,8 +267,8 @@ export const useLogsData = () => {
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
     let url = `/api/log/self/stat?type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}`;
     url = encodeURI(url);
     let res = await API.get(url);
@@ -296,8 +292,8 @@ export const useLogsData = () => {
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
     let url = `/api/log/stat?type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}`;
     url = encodeURI(url);
     let res = await API.get(url);
@@ -444,7 +440,6 @@ export const useLogsData = () => {
                 other.cache_creation_ratio_1h ||
                   other.cache_creation_ratio ||
                   1.0,
-                billingDisplayMode,
               )
             : renderLogContent(
                 other?.model_ratio,
@@ -459,7 +454,6 @@ export const useLogsData = () => {
                 other.web_search_call_count || 0,
                 other.file_search || false,
                 other.file_search_call_count || 0,
-                billingDisplayMode,
               ),
         });
         if (logs[i]?.content) {
@@ -516,7 +510,6 @@ export const useLogsData = () => {
               other?.user_group_ratio,
               other?.cache_tokens || 0,
               other?.cache_ratio || 1.0,
-              billingDisplayMode,
             );
           } else if (other?.claude) {
             content = renderClaudeModelPrice(
@@ -539,7 +532,6 @@ export const useLogsData = () => {
               other.cache_creation_ratio_1h ||
                 other.cache_creation_ratio ||
                 1.0,
-              billingDisplayMode,
             );
           } else {
             content = renderModelPrice(
@@ -566,7 +558,6 @@ export const useLogsData = () => {
               other?.audio_input_price || 0,
               other?.image_generation_call || false,
               other?.image_generation_call_price || 0,
-              billingDisplayMode,
             );
           }
           expandDataLocal.push({
@@ -633,7 +624,7 @@ export const useLogsData = () => {
       }
       if (Array.isArray(other?.po) && other.po.length > 0) {
         expandDataLocal.push({
-          key: t('参数覆盖'),
+          key: t('鍙傛暟瑕嗙洊'),
           value: (
             <ParamOverrideEntry
               count={other.po.length}
@@ -744,8 +735,8 @@ export const useLogsData = () => {
           ? formLogType
           : logType;
 
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
+    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
     if (isAdminUser) {
       url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&request_id=${request_id}`;
     } else {
@@ -820,6 +811,28 @@ export const useLogsData = () => {
     }
   }, [formApi]);
 
+  useEffect(() => {
+    if (!formApi) {
+      return;
+    }
+
+    const currentSearchKey = searchParams.toString();
+    if (appliedSearchRef.current === currentSearchKey) {
+      return;
+    }
+
+    const shouldRefresh = appliedSearchRef.current !== '';
+    formApi.setValues(formInitValues);
+    setLogType(Number(formInitValues.logType) || 0);
+    appliedSearchRef.current = currentSearchKey;
+
+    if (shouldRefresh) {
+      setTimeout(() => {
+        refresh().then();
+      }, 0);
+    }
+  }, [formApi, formInitValues, refresh, searchParams]);
+
   // Check if any record has expandable content
   const hasExpandableRows = () => {
     return logs.some(
@@ -851,8 +864,6 @@ export const useLogsData = () => {
     visibleColumns,
     showColumnSelector,
     setShowColumnSelector,
-    billingDisplayMode,
-    setBillingDisplayMode,
     handleColumnVisibilityChange,
     handleSelectAll,
     initDefaultColumns,

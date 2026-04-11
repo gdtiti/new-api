@@ -1075,30 +1075,24 @@ func resolveHeaderOverrideValueByMapping(context map[string]interface{}, headerN
 		return "", false, fmt.Errorf("header value mapping cannot be empty")
 	}
 
-	appendTokens, err := parseHeaderAppendTokens(mapping)
-	if err != nil {
-		return "", false, err
-	}
-	keepOnlyDeclared := parseHeaderKeepOnlyDeclared(mapping)
-
 	sourceValue, exists := getHeaderValueFromContext(context, headerName)
-	sourceTokens := make([]string, 0)
-	if exists {
-		sourceTokens = splitHeaderListValue(sourceValue)
+	if !exists {
+		return "", false, nil
+	}
+	sourceTokens := splitHeaderListValue(sourceValue)
+	if len(sourceTokens) == 0 {
+		return "", false, nil
 	}
 
 	wildcardValue, hasWildcard := mapping["*"]
-	resultTokens := make([]string, 0, len(sourceTokens)+len(appendTokens))
+	resultTokens := make([]string, 0, len(sourceTokens))
 	for _, token := range sourceTokens {
 		replacementRaw, hasReplacement := mapping[token]
-		if !hasReplacement && hasWildcard && !keepOnlyDeclared {
+		if !hasReplacement && hasWildcard {
 			replacementRaw = wildcardValue
 			hasReplacement = true
 		}
 		if !hasReplacement {
-			if keepOnlyDeclared {
-				continue
-			}
 			resultTokens = append(resultTokens, token)
 			continue
 		}
@@ -1109,32 +1103,11 @@ func resolveHeaderOverrideValueByMapping(context map[string]interface{}, headerN
 		resultTokens = append(resultTokens, replacementTokens...)
 	}
 
-	resultTokens = append(resultTokens, appendTokens...)
 	resultTokens = lo.Uniq(resultTokens)
 	if len(resultTokens) == 0 {
 		return "", false, nil
 	}
 	return strings.Join(resultTokens, ","), true, nil
-}
-
-func parseHeaderAppendTokens(mapping map[string]interface{}) ([]string, error) {
-	appendRaw, ok := mapping["$append"]
-	if !ok {
-		return nil, nil
-	}
-	return parseHeaderReplacementTokens(appendRaw)
-}
-
-func parseHeaderKeepOnlyDeclared(mapping map[string]interface{}) bool {
-	keepOnlyDeclaredRaw, ok := mapping["$keep_only_declared"]
-	if !ok {
-		return false
-	}
-	keepOnlyDeclared, ok := keepOnlyDeclaredRaw.(bool)
-	if !ok {
-		return false
-	}
-	return keepOnlyDeclared
 }
 
 func parseHeaderReplacementTokens(value interface{}) ([]string, error) {

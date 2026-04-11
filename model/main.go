@@ -257,6 +257,7 @@ func migrateDB() error {
 
 	err := DB.AutoMigrate(
 		&Channel{},
+		&ChannelBaseURL{},
 		&Token{},
 		&User{},
 		&PasskeyCredential{},
@@ -284,6 +285,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := migrateRedemptionEnhancements(); err != nil {
+		return err
+	}
 	if common.UsingSQLite {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -305,6 +309,7 @@ func migrateDBFast() error {
 		name  string
 	}{
 		{&Channel{}, "Channel"},
+		{&ChannelBaseURL{}, "ChannelBaseURL"},
 		{&Token{}, "Token"},
 		{&User{}, "User"},
 		{&PasskeyCredential{}, "PasskeyCredential"},
@@ -326,6 +331,7 @@ func migrateDBFast() error {
 		{&SubscriptionOrder{}, "SubscriptionOrder"},
 		{&UserSubscription{}, "UserSubscription"},
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
+		{&RedemptionUsage{}, "RedemptionUsage"},
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
 	}
@@ -361,6 +367,9 @@ func migrateDBFast() error {
 			return err
 		}
 	}
+	if err := migrateRedemptionEnhancements(); err != nil {
+		return err
+	}
 	common.SysLog("database migrated")
 	return nil
 }
@@ -368,6 +377,33 @@ func migrateDBFast() error {
 func migrateLOGDB() error {
 	var err error
 	if err = LOG_DB.AutoMigrate(&Log{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func migrateRedemptionEnhancements() error {
+	if err := DB.AutoMigrate(&RedemptionUsage{}); err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("grant_type = '' OR grant_type IS NULL").
+		Update("grant_type", common.RedemptionGrantTypeQuota).Error; err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("max_redeem_count <= ?", 0).
+		Update("max_redeem_count", 1).Error; err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("redeemed_count = ? AND status = ?", 0, common.RedemptionCodeStatusUsed).
+		Update("redeemed_count", 1).Error; err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("redeemed_count = ? AND used_user_id > ?", 0, 0).
+		Update("redeemed_count", 1).Error; err != nil {
 		return err
 	}
 	return nil

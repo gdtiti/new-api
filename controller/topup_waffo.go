@@ -254,7 +254,6 @@ func RequestWaffoPay(c *gin.Context) {
 
 	orderData := resp.GetData()
 	log.Printf("Waffo 订单创建成功 - 用户: %d, 订单: %s, 金额: %.2f", id, merchantOrderId, payMoney)
-
 	paymentUrl := orderData.FetchRedirectURL()
 	if paymentUrl == "" {
 		paymentUrl = orderData.OrderAction
