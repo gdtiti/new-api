@@ -299,8 +299,16 @@ func RelayMidjourneyTaskImageSeed(c *gin.Context) *dto.MidjourneyResponse {
 	c.Set("channel_id", originTask.ChannelId)
 	c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
 
+	selectedBaseURL, newAPIError := service.SelectChannelBaseURL(c, channel, 0)
+	if newAPIError != nil {
+		return service.MidjourneyErrorWrapper(constant.MjRequestError, "channel_no_available_base_url")
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, selectedBaseURL.URL)
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrlId, selectedBaseURL.BaseURLID)
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrlIndex, selectedBaseURL.BaseURLIndex)
+
 	requestURL := getMjRequestPath(c.Request.URL.String())
-	fullRequestURL := fmt.Sprintf("%s%s", channel.GetBaseURL(), requestURL)
+	fullRequestURL := fmt.Sprintf("%s%s", selectedBaseURL.URL, requestURL)
 	midjResponseWithStatus, _, err := service.DoMidjourneyHttpRequest(c, time.Second*30, fullRequestURL)
 	if err != nil {
 		return &midjResponseWithStatus.Response
@@ -470,10 +478,16 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 			if channel.Status != common.ChannelStatusEnabled {
 				return service.MidjourneyErrorWrapper(constant.MjRequestError, "该任务所属渠道已被禁用")
 			}
-			c.Set("base_url", channel.GetBaseURL())
+			selectedBaseURL, newAPIError := service.SelectChannelBaseURL(c, channel, 0)
+			if newAPIError != nil {
+				return service.MidjourneyErrorWrapper(constant.MjRequestError, "channel_no_available_base_url")
+			}
+			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, selectedBaseURL.URL)
+			common.SetContextKey(c, constant.ContextKeyChannelBaseUrlId, selectedBaseURL.BaseURLID)
+			common.SetContextKey(c, constant.ContextKeyChannelBaseUrlIndex, selectedBaseURL.BaseURLIndex)
 			c.Set("channel_id", originTask.ChannelId)
 			c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", channel.Key))
-			log.Printf("检测到此操作为放大、变换、重绘，获取原channel信息: %s,%s", strconv.Itoa(originTask.ChannelId), channel.GetBaseURL())
+			log.Printf("检测到此操作为放大、变换、重绘，获取原channel信息: %s,%s", strconv.Itoa(originTask.ChannelId), selectedBaseURL.URL)
 		}
 		midjRequest.Prompt = originTask.Prompt
 

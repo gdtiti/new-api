@@ -3,10 +3,12 @@ package model
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/samber/lo"
 	"gorm.io/gorm"
@@ -104,43 +106,106 @@ func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
 }
 
 func GetChannel(group string, model string, retry int) (*Channel, error) {
-	var abilities []Ability
+	return GetChannelWithFilter(group, model, retry, nil)
+}
 
-	var err error = nil
-	channelQuery, err := getChannelQuery(group, model, retry)
-	if err != nil {
-		return nil, err
+func GetChannelWithFilter(group string, model string, retry int, channelFilter ChannelFilter) (*Channel, error) {
+	channel, err := getChannelWithFilterByModel(group, model, retry, channelFilter)
+	if err != nil || channel != nil {
+		return channel, err
 	}
-	if common.UsingSQLite || common.UsingPostgreSQL {
-		err = channelQuery.Order("weight DESC").Find(&abilities).Error
-	} else {
-		err = channelQuery.Order("weight DESC").Find(&abilities).Error
-	}
-	if err != nil {
-		return nil, err
-	}
-	channel := Channel{}
-	if len(abilities) > 0 {
-		// Randomly choose one
-		weightSum := uint(0)
-		for _, ability_ := range abilities {
-			weightSum += ability_.Weight + 10
-		}
-		// Randomly choose one
-		weight := common.GetRandomInt(int(weightSum))
-		for _, ability_ := range abilities {
-			weight -= int(ability_.Weight) + 10
-			//log.Printf("weight: %d, ability weight: %d", weight, *ability_.Weight)
-			if weight <= 0 {
-				channel.Id = ability_.ChannelId
-				break
-			}
-		}
-	} else {
+
+	normalizedModel := ratio_setting.FormatMatchingModelName(model)
+	if normalizedModel == "" || normalizedModel == model {
 		return nil, nil
 	}
-	err = DB.First(&channel, "id = ?", channel.Id).Error
-	return &channel, err
+	return getChannelWithFilterByModel(group, normalizedModel, retry, channelFilter)
+}
+
+type weightedChannel struct {
+	channel *Channel
+	weight  uint
+}
+
+func getChannelWithFilterByModel(group string, model string, retry int, channelFilter ChannelFilter) (*Channel, error) {
+	var abilities []Ability
+	err := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).
+		Order("priority DESC").
+		Order("weight DESC").
+		Find(&abilities).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(abilities) == 0 {
+		return nil, nil
+	}
+
+	channelIDs := make([]int, 0, len(abilities))
+	channelIDSet := make(map[int]struct{}, len(abilities))
+	for _, ability := range abilities {
+		if _, exists := channelIDSet[ability.ChannelId]; exists {
+			continue
+		}
+		channelIDSet[ability.ChannelId] = struct{}{}
+		channelIDs = append(channelIDs, ability.ChannelId)
+	}
+
+	channels, err := GetChannelsByIds(channelIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	channelMap := make(map[int]*Channel, len(channels))
+	for _, channel := range channels {
+		channelMap[channel.Id] = channel
+	}
+
+	buckets := make(map[int64][]weightedChannel)
+	for _, ability := range abilities {
+		channel, ok := channelMap[ability.ChannelId]
+		if !ok {
+			return nil, fmt.Errorf("鏁版嵁搴撲竴鑷存€ч敊璇紝娓犻亾# %d 涓嶅瓨鍦紝璇疯仈绯荤鐞嗗憳淇", ability.ChannelId)
+		}
+		if channelFilter != nil && !channelFilter(channel) {
+			continue
+		}
+		priority := int64(0)
+		if ability.Priority != nil {
+			priority = *ability.Priority
+		}
+		buckets[priority] = append(buckets[priority], weightedChannel{
+			channel: channel,
+			weight:  ability.Weight,
+		})
+	}
+
+	if len(buckets) == 0 {
+		return nil, nil
+	}
+
+	priorities := make([]int64, 0, len(buckets))
+	for priority := range buckets {
+		priorities = append(priorities, priority)
+	}
+	sort.Slice(priorities, func(i, j int) bool {
+		return priorities[i] > priorities[j]
+	})
+	if retry >= len(priorities) {
+		retry = len(priorities) - 1
+	}
+	targetChannels := buckets[priorities[retry]]
+	weightSum := uint(0)
+	for _, targetChannel := range targetChannels {
+		weightSum += targetChannel.weight + 10
+	}
+	weight := common.GetRandomInt(int(weightSum))
+	for _, targetChannel := range targetChannels {
+		weight -= int(targetChannel.weight) + 10
+		if weight <= 0 {
+			return targetChannel.channel, nil
+		}
+	}
+	return nil, errors.New("channel not found")
 }
 
 func (channel *Channel) AddAbilities(tx *gorm.DB) error {

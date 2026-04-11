@@ -131,16 +131,10 @@ func requestOpenAI2Dify(c *gin.Context, info *relaycommon.RelayInfo, request dto
 	}
 
 	user := request.User
-	if len(user) == 0 {
-		user = json.RawMessage(helper.GetResponseID(c))
+	if user == "" {
+		user = helper.GetResponseID(c)
 	}
-	var stringUser string
-	err := json.Unmarshal(user, &stringUser)
-	if err != nil {
-		common.SysLog("failed to unmarshal user: " + err.Error())
-		stringUser = helper.GetResponseID(c)
-	}
-	difyReq.User = stringUser
+	difyReq.User = user
 
 	files := make([]DifyFile, 0)
 	var content strings.Builder

@@ -325,6 +325,8 @@ export const getChannelsColumns = ({
   checkOllamaVersion,
   setShowMultiKeyManageModal,
   setCurrentMultiKeyChannel,
+  setShowBaseUrlManageModal,
+  setCurrentBaseUrlChannel,
   openUpstreamUpdateModal,
   detectChannelUpstreamUpdates,
 }) => {
@@ -723,6 +725,15 @@ export const getChannelsColumns = ({
                   content: t('复制渠道的所有信息'),
                   onOk: () => copySelectedChannel(record),
                 });
+              },
+            },
+            {
+              node: 'item',
+              name: t('BaseURL 管理'),
+              type: 'tertiary',
+              onClick: () => {
+                setCurrentBaseUrlChannel && setCurrentBaseUrlChannel(record);
+                setShowBaseUrlManageModal && setShowBaseUrlManageModal(true);
               },
             },
           ];

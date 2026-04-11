@@ -25,6 +25,7 @@ import { StatusContext } from '../../context/Status';
 import DashboardHeader from './DashboardHeader';
 import StatsCards from './StatsCards';
 import ChartsPanel from './ChartsPanel';
+import QualityAnalysisPanel from './QualityAnalysisPanel';
 import ApiInfoPanel from './ApiInfoPanel';
 import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
@@ -34,6 +35,7 @@ import SearchModal from './modals/SearchModal';
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
 import { useDashboardCharts } from '../../hooks/dashboard/useDashboardCharts';
+import { useQualityAnalytics } from '../../hooks/dashboard/useQualityAnalytics';
 
 import {
   CHART_CONFIG,
@@ -85,6 +87,12 @@ const Dashboard = () => {
     dashboardData.t,
   );
 
+  const qualityAnalytics = useQualityAnalytics(
+    dashboardData.inputs,
+    dashboardData.dataExportDefaultTime,
+    dashboardData.isAdminUser,
+  );
+
   // ========== 数据处理 ==========
   const loadUserData = async () => {
     if (dashboardData.isAdminUser) {
@@ -103,6 +111,7 @@ const Dashboard = () => {
     });
     await loadUserData();
     await dashboardData.loadUptimeData();
+    await qualityAnalytics.loadAnalytics();
   };
 
   const handleRefresh = async () => {
@@ -111,11 +120,13 @@ const Dashboard = () => {
       dashboardCharts.updateChartData(data);
     }
     await loadUserData();
+    await qualityAnalytics.loadAnalytics();
   };
 
   const handleSearchConfirm = async () => {
     await dashboardData.handleSearchConfirm(dashboardCharts.updateChartData);
     await loadUserData();
+    await qualityAnalytics.loadAnalytics();
   };
 
   // ========== 数据准备 ==========
@@ -277,6 +288,27 @@ const Dashboard = () => {
               />
             )}
           </div>
+        </div>
+      )}
+
+      {dashboardData.isAdminUser && (
+        <div className='grid grid-cols-1 2xl:grid-cols-2 gap-4'>
+          <QualityAnalysisPanel
+            title={dashboardData.t('渠道质量分析')}
+            analytics={qualityAnalytics.channelAnalytics}
+            loading={qualityAnalytics.analyticsLoading}
+            CARD_PROPS={CARD_PROPS}
+            CHART_CONFIG={CHART_CONFIG}
+            t={dashboardData.t}
+          />
+          <QualityAnalysisPanel
+            title={dashboardData.t('模型质量分析')}
+            analytics={qualityAnalytics.modelAnalytics}
+            loading={qualityAnalytics.analyticsLoading}
+            CARD_PROPS={CARD_PROPS}
+            CHART_CONFIG={CHART_CONFIG}
+            t={dashboardData.t}
+          />
         </div>
       )}
     </div>

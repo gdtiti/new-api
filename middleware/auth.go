@@ -343,23 +343,12 @@ func TokenAuth() func(c *gin.Context) {
 		userCache.WriteContext(c)
 
 		userGroup := userCache.Group
-		tokenGroup := token.Group
-		if tokenGroup != "" {
-			// check common.UserUsableGroups[userGroup]
-			if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
-				abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("无权访问 %s 分组", tokenGroup))
-				return
-			}
-			// check group in common.GroupRatio
-			if !ratio_setting.ContainsGroupRatio(tokenGroup) {
-				if tokenGroup != "auto" {
-					abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("分组 %s 已被弃用", tokenGroup))
-					return
-				}
-			}
-			userGroup = tokenGroup
+		resolvedGroup, err := resolveTokenUsingGroup(userGroup, token.Group)
+		if err != nil {
+			abortWithOpenAiMessage(c, http.StatusForbidden, err.Error())
+			return
 		}
-		common.SetContextKey(c, constant.ContextKeyUsingGroup, userGroup)
+		common.SetContextKey(c, constant.ContextKeyUsingGroup, resolvedGroup)
 
 		err = SetupContextForToken(c, token, parts...)
 		if err != nil {
@@ -367,6 +356,22 @@ func TokenAuth() func(c *gin.Context) {
 		}
 		c.Next()
 	}
+}
+
+func resolveTokenUsingGroup(userGroup, tokenGroup string) (string, error) {
+	if tokenGroup == "" {
+		return userGroup, nil
+	}
+	if tokenGroup == "auto" {
+		return tokenGroup, nil
+	}
+	if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
+		return "", fmt.Errorf("无权访问 %s 分组", tokenGroup)
+	}
+	if !ratio_setting.ContainsGroupRatio(tokenGroup) {
+		return "", fmt.Errorf("分组 %s 已被弃用", tokenGroup)
+	}
+	return tokenGroup, nil
 }
 
 func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) error {

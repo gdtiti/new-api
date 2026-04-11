@@ -186,6 +186,7 @@ const EditChannelModal = (props) => {
     groups: ['default'],
     priority: 0,
     weight: 0,
+    max_concurrency: 0,
     tag: '',
     multi_key_mode: 'random',
     // 渠道额外设置的默认值
@@ -209,6 +210,10 @@ const EditChannelModal = (props) => {
     allow_include_obfuscation: false,
     allow_inference_geo: false,
     claude_beta_query: false,
+    openai_responses_ws_enabled: false,
+    openai_responses_ws_base_url: '',
+    openai_responses_ws_path: '',
+    openai_responses_ws_passthrough_headers: '',
     upstream_model_update_check_enabled: false,
     upstream_model_update_auto_sync_enabled: false,
     upstream_model_update_last_check_time: 0,
@@ -818,6 +823,9 @@ const EditChannelModal = (props) => {
       } else {
         data.groups = data.group.split(',');
       }
+      data.max_concurrency = Number.isFinite(Number(data.max_concurrency))
+        ? Number(data.max_concurrency)
+        : 0;
       if (data.model_mapping !== '') {
         data.model_mapping = JSON.stringify(
           JSON.parse(data.model_mapping),
@@ -891,6 +899,17 @@ const EditChannelModal = (props) => {
           data.allow_inference_geo =
             parsedSettings.allow_inference_geo || false;
           data.claude_beta_query = parsedSettings.claude_beta_query || false;
+          data.openai_responses_ws_enabled =
+            parsedSettings.openai_responses_ws_enabled === true;
+          data.openai_responses_ws_base_url =
+            parsedSettings.openai_responses_ws_base_url || '';
+          data.openai_responses_ws_path =
+            parsedSettings.openai_responses_ws_path || '';
+          data.openai_responses_ws_passthrough_headers = Array.isArray(
+            parsedSettings.openai_responses_ws_passthrough_headers,
+          )
+            ? parsedSettings.openai_responses_ws_passthrough_headers.join(',')
+            : '';
           data.upstream_model_update_check_enabled =
             parsedSettings.upstream_model_update_check_enabled === true;
           data.upstream_model_update_auto_sync_enabled =
@@ -920,6 +939,10 @@ const EditChannelModal = (props) => {
           data.allow_include_obfuscation = false;
           data.allow_inference_geo = false;
           data.claude_beta_query = false;
+          data.openai_responses_ws_enabled = false;
+          data.openai_responses_ws_base_url = '';
+          data.openai_responses_ws_path = '';
+          data.openai_responses_ws_passthrough_headers = '';
           data.upstream_model_update_check_enabled = false;
           data.upstream_model_update_auto_sync_enabled = false;
           data.upstream_model_update_last_check_time = 0;
@@ -937,6 +960,10 @@ const EditChannelModal = (props) => {
         data.allow_include_obfuscation = false;
         data.allow_inference_geo = false;
         data.claude_beta_query = false;
+        data.openai_responses_ws_enabled = false;
+        data.openai_responses_ws_base_url = '';
+        data.openai_responses_ws_path = '';
+        data.openai_responses_ws_passthrough_headers = '';
         data.upstream_model_update_check_enabled = false;
         data.upstream_model_update_auto_sync_enabled = false;
         data.upstream_model_update_last_check_time = 0;
@@ -1009,6 +1036,7 @@ const EditChannelModal = (props) => {
         (data.remark && data.remark.trim()) ||
         (data.priority && data.priority !== 0) ||
         (data.weight && data.weight !== 0) ||
+        (data.max_concurrency && data.max_concurrency !== 0) ||
         (data.proxy && data.proxy.trim()) ||
         (data.system_prompt && data.system_prompt.trim()) ||
         data.thinking_to_content ||
@@ -1780,6 +1808,30 @@ const EditChannelModal = (props) => {
       }
     }
 
+    if (localInputs.type === 1 || localInputs.type === 57) {
+      settings.openai_responses_ws_enabled =
+        localInputs.openai_responses_ws_enabled === true;
+      settings.openai_responses_ws_base_url = String(
+        localInputs.openai_responses_ws_base_url || '',
+      ).trim();
+      settings.openai_responses_ws_path = String(
+        localInputs.openai_responses_ws_path || '',
+      ).trim();
+      settings.openai_responses_ws_passthrough_headers = Array.from(
+        new Set(
+          String(localInputs.openai_responses_ws_passthrough_headers || '')
+            .split(',')
+            .map((header) => header.trim())
+            .filter(Boolean),
+        ),
+      );
+    } else {
+      delete settings.openai_responses_ws_enabled;
+      delete settings.openai_responses_ws_base_url;
+      delete settings.openai_responses_ws_path;
+      delete settings.openai_responses_ws_passthrough_headers;
+    }
+
     settings.upstream_model_update_check_enabled =
       localInputs.upstream_model_update_check_enabled === true;
     settings.upstream_model_update_auto_sync_enabled =
@@ -1824,6 +1876,10 @@ const EditChannelModal = (props) => {
     delete localInputs.allow_include_obfuscation;
     delete localInputs.allow_inference_geo;
     delete localInputs.claude_beta_query;
+    delete localInputs.openai_responses_ws_enabled;
+    delete localInputs.openai_responses_ws_base_url;
+    delete localInputs.openai_responses_ws_path;
+    delete localInputs.openai_responses_ws_passthrough_headers;
     delete localInputs.upstream_model_update_check_enabled;
     delete localInputs.upstream_model_update_auto_sync_enabled;
     delete localInputs.upstream_model_update_last_check_time;
@@ -2456,6 +2512,21 @@ const EditChannelModal = (props) => {
                         placeholder={t('渠道权重')}
                         min={0}
                         onNumberChange={(value) => handleInputChange('weight', value)}
+                        style={{ width: '100%' }}
+                      />
+                    </Col>
+                  </Row>
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.InputNumber
+                        field='max_concurrency'
+                        label={t('渠道最大并发数')}
+                        placeholder={t('渠道最大并发数')}
+                        min={0}
+                        extraText={t('0 表示不限制')}
+                        onNumberChange={(value) =>
+                          handleInputChange('max_concurrency', value)
+                        }
                         style={{ width: '100%' }}
                       />
                     </Col>

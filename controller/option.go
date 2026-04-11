@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,56 +17,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var completionRatioMetaOptionKeys = []string{
-	"ModelPrice",
-	"ModelRatio",
-	"CompletionRatio",
-	"CacheRatio",
-	"CreateCacheRatio",
-	"ImageRatio",
-	"AudioRatio",
-	"AudioCompletionRatio",
-}
-
-func collectModelNamesFromOptionValue(raw string, modelNames map[string]struct{}) {
-	if strings.TrimSpace(raw) == "" {
-		return
-	}
-
-	var parsed map[string]any
-	if err := common.UnmarshalJsonStr(raw, &parsed); err != nil {
-		return
-	}
-
-	for modelName := range parsed {
-		modelNames[modelName] = struct{}{}
-	}
-}
-
-func buildCompletionRatioMetaValue(optionValues map[string]string) string {
-	modelNames := make(map[string]struct{})
-	for _, key := range completionRatioMetaOptionKeys {
-		collectModelNamesFromOptionValue(optionValues[key], modelNames)
-	}
-
-	meta := make(map[string]ratio_setting.CompletionRatioInfo, len(modelNames))
-	for modelName := range modelNames {
-		meta[modelName] = ratio_setting.GetCompletionRatioInfo(modelName)
-	}
-
-	jsonBytes, err := common.Marshal(meta)
-	if err != nil {
-		return "{}"
-	}
-	return string(jsonBytes)
-}
-
 func GetOptions(c *gin.Context) {
 	var options []*model.Option
-	optionValues := make(map[string]string)
 	common.OptionMapRWMutex.Lock()
 	for k, v := range common.OptionMap {
-		value := common.Interface2String(v)
 		if strings.HasSuffix(k, "Token") ||
 			strings.HasSuffix(k, "Secret") ||
 			strings.HasSuffix(k, "Key") ||
@@ -75,20 +30,10 @@ func GetOptions(c *gin.Context) {
 		}
 		options = append(options, &model.Option{
 			Key:   k,
-			Value: value,
+			Value: common.Interface2String(v),
 		})
-		for _, optionKey := range completionRatioMetaOptionKeys {
-			if optionKey == k {
-				optionValues[k] = value
-				break
-			}
-		}
 	}
 	common.OptionMapRWMutex.Unlock()
-	options = append(options, &model.Option{
-		Key:   "CompletionRatioMeta",
-		Value: buildCompletionRatioMetaValue(optionValues),
-	})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -104,7 +49,7 @@ type OptionUpdateRequest struct {
 
 func UpdateOption(c *gin.Context) {
 	var option OptionUpdateRequest
-	err := common.DecodeJson(c.Request.Body, &option)
+	err := json.NewDecoder(c.Request.Body).Decode(&option)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -178,6 +123,55 @@ func UpdateOption(c *gin.Context) {
 				"message": "无法启用 Turnstile 校验，请先填入 Turnstile 校验相关配置信息！",
 			})
 
+			return
+		}
+	case "RegisterDefaultSubscriptionEnabled":
+		if option.Value == "true" {
+			if common.RegisterDefaultSubscriptionPlanId <= 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用注册默认订阅，请先配置默认订阅套餐！",
+				})
+				return
+			}
+			plan, err := model.GetSubscriptionPlanById(common.RegisterDefaultSubscriptionPlanId)
+			if err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用注册默认订阅，默认订阅套餐不存在！",
+				})
+				return
+			}
+			if !plan.Enabled {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用注册默认订阅，默认订阅套餐未启用！",
+				})
+				return
+			}
+		}
+	case "RegisterDefaultSubscriptionPlanId":
+		planId := common.String2Int(option.Value.(string))
+		if planId <= 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "默认订阅套餐无效",
+			})
+			return
+		}
+		plan, err := model.GetSubscriptionPlanById(planId)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "默认订阅套餐不存在",
+			})
+			return
+		}
+		if !plan.Enabled {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "默认订阅套餐未启用",
+			})
 			return
 		}
 	case "TelegramOAuthEnabled":

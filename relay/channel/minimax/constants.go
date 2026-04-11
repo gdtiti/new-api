@@ -17,7 +17,7 @@ var ModelList = []string{
 	"speech-01-hd",
 	"speech-01-turbo",
 	"MiniMax-M2.1",
-	"MiniMax-M2.1-highspeed",
+	"MiniMax-M2.1-lightning",
 	"MiniMax-M2",
 	"MiniMax-M2.5",
 	"MiniMax-M2.5-highspeed",

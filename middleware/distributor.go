@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/service"
@@ -27,9 +28,34 @@ type ModelRequest struct {
 	Group string `json:"group,omitempty"`
 }
 
+func isWebSocketResponsesRequest(c *gin.Context) bool {
+	if c == nil || c.Request == nil {
+		return false
+	}
+	if c.Request.Method != http.MethodGet {
+		return false
+	}
+	if !strings.HasPrefix(c.Request.URL.Path, "/v1/responses") {
+		return false
+	}
+	return strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
+}
+
 func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
+		defer service.ReleaseChannelConcurrencyReservation(c)
+
 		var channel *model.Channel
+		requestPath := c.Request.URL.Path
+		var channelFilter model.ChannelFilter
+		if service.ShouldRestrictOpenAIUpstreamByRequestPath(requestPath) {
+			channelFilter = func(candidate *model.Channel) bool {
+				if candidate == nil {
+					return false
+				}
+				return service.IsAllowedOpenAIUpstreamChannelType(candidate.Type)
+			}
+		}
 		channelId, ok := common.GetContextKey(c, constant.ContextKeyTokenSpecificChannelId)
 		modelRequest, shouldSelectChannel, err := getModelRequest(c)
 		if err != nil {
@@ -49,6 +75,15 @@ func Distribute() func(c *gin.Context) {
 			}
 			if channel.Status != common.ChannelStatusEnabled {
 				abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
+				return
+			}
+			if channelFilter != nil && !channelFilter(channel) {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "当前请求已启用 OpenAI 下游严格上游限制，仅允许 OpenAI/Codex 渠道")
+				return
+			}
+			if !service.TryAcquireChannelConcurrency(c, channel) {
+				logger.LogWarn(c, fmt.Sprintf("specific channel concurrency limit reached: channel_id=%d, channel_name=%s, max_concurrency=%d", channel.Id, channel.Name, channel.GetMaxConcurrency()))
+				abortWithOpenAiMessage(c, http.StatusServiceUnavailable, "指定渠道已达到最大并发限制，请稍后重试", types.ErrorCodeGetChannelFailed)
 				return
 			}
 		} else {
@@ -107,32 +142,47 @@ func Distribute() func(c *gin.Context) {
 								abortWithOpenAiMessage(c, http.StatusForbidden, i18n.T(c, i18n.MsgDistributorChannelDisabled))
 								return
 							}
-						} else if usingGroup == "auto" {
+							preferred = nil
+						} else if channelFilter != nil && !channelFilter(preferred) {
+							preferred = nil
+						}
+					}
+					if preferred != nil {
+						if usingGroup == "auto" {
 							userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 							autoGroups := service.GetUserAutoGroup(userGroup)
 							for _, g := range autoGroups {
 								if model.IsChannelEnabledForGroupModel(g, modelRequest.Model, preferred.Id) {
-									selectGroup = g
-									common.SetContextKey(c, constant.ContextKeyAutoGroup, g)
-									channel = preferred
-									service.MarkChannelAffinityUsed(c, g, preferred.Id)
+									if service.TryAcquireChannelConcurrency(c, preferred) {
+										selectGroup = g
+										common.SetContextKey(c, constant.ContextKeyAutoGroup, g)
+										channel = preferred
+										service.MarkChannelAffinityUsed(c, g, preferred.Id)
+									} else {
+										logger.LogWarn(c, fmt.Sprintf("affinity preferred channel concurrency limit reached: channel_id=%d, channel_name=%s, model=%s, selected_group=%s", preferred.Id, preferred.Name, modelRequest.Model, g))
+									}
 									break
 								}
 							}
 						} else if model.IsChannelEnabledForGroupModel(usingGroup, modelRequest.Model, preferred.Id) {
-							channel = preferred
-							selectGroup = usingGroup
-							service.MarkChannelAffinityUsed(c, usingGroup, preferred.Id)
+							if service.TryAcquireChannelConcurrency(c, preferred) {
+								channel = preferred
+								selectGroup = usingGroup
+								service.MarkChannelAffinityUsed(c, usingGroup, preferred.Id)
+							} else {
+								logger.LogWarn(c, fmt.Sprintf("affinity preferred channel concurrency limit reached: channel_id=%d, channel_name=%s, model=%s, selected_group=%s", preferred.Id, preferred.Name, modelRequest.Model, usingGroup))
+							}
 						}
 					}
 				}
 
 				if channel == nil {
 					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:        c,
-						ModelName:  modelRequest.Model,
-						TokenGroup: usingGroup,
-						Retry:      common.GetPointer(0),
+						Ctx:           c,
+						ModelName:     modelRequest.Model,
+						TokenGroup:    usingGroup,
+						Retry:         common.GetPointer(0),
+						ChannelFilter: channelFilter,
 					})
 					if err != nil {
 						showGroup := usingGroup
@@ -156,10 +206,23 @@ func Distribute() func(c *gin.Context) {
 			}
 		}
 		common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
-		SetupContextForSelectedChannel(c, channel, modelRequest.Model)
+		if channel != nil {
+			if setupErr := SetupContextForSelectedChannel(c, channel, modelRequest.Model); setupErr != nil {
+				service.ReleaseChannelConcurrencyReservation(c)
+				abortWithOpenAiMessage(c, setupErr.StatusCode, setupErr.MaskSensitiveError(), setupErr.GetErrorCode())
+				return
+			}
+		}
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
+			baseURLID := common.GetContextKeyInt(c, constant.ContextKeyChannelBaseUrlId)
+			if baseURLID > 0 {
+				if err := service.RecordChannelBaseURLSuccess(channel.Id, baseURLID); err != nil {
+					common.SysError(fmt.Sprintf("record channel base_url success failed: channel_id=%d, base_url_id=%d, err=%v", channel.Id, baseURLID, err))
+				}
+			}
 			service.RecordChannelAffinity(c, channel.Id)
+			service.RecordChannelBaseURLAffinity(c)
 		}
 	}
 }
@@ -182,6 +245,9 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 	var modelRequest ModelRequest
 	shouldSelectChannel := true
 	var err error
+	if isWebSocketResponsesRequest(c) {
+		return &modelRequest, false, nil
+	}
 	if strings.Contains(c.Request.URL.Path, "/mj/") {
 		relayMode := relayconstant.Path2RelayModeMidjourney(c.Request.URL.Path)
 		if relayMode == relayconstant.RelayModeMidjourneyTaskFetch ||
@@ -343,6 +409,10 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 }
 
 func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) *types.NewAPIError {
+	return SetupContextForSelectedChannelWithForcedBaseURL(c, channel, modelName, 0)
+}
+
+func SetupContextForSelectedChannelWithForcedBaseURL(c *gin.Context, channel *model.Channel, modelName string, forceBaseURLID int) *types.NewAPIError {
 	c.Set("original_model", modelName) // for retry
 	if channel == nil {
 		return types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
@@ -380,7 +450,13 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	}
 	// c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
 	common.SetContextKey(c, constant.ContextKeyChannelKey, key)
-	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channel.GetBaseURL())
+	selectedBaseURL, newAPIError := service.SelectChannelBaseURL(c, channel, forceBaseURLID)
+	if newAPIError != nil {
+		return newAPIError
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, selectedBaseURL.URL)
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrlId, selectedBaseURL.BaseURLID)
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrlIndex, selectedBaseURL.BaseURLIndex)
 
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, false)
 

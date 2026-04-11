@@ -232,7 +232,7 @@ func GetSubscriptionOrderByTradeNo(tradeNo string) *SubscriptionOrder {
 // User subscription instance
 type UserSubscription struct {
 	Id     int `json:"id"`
-	UserId int `json:"user_id" gorm:"index;index:idx_user_sub_active,priority:1"`
+	UserId int `json:"user_id" gorm:"index;index:idx_user_sub_active,priority:1;uniqueIndex:idx_user_sub_grant_key,priority:1"`
 	PlanId int `json:"plan_id" gorm:"index"`
 
 	AmountTotal int64 `json:"amount_total" gorm:"type:bigint;not null;default:0"`
@@ -242,7 +242,8 @@ type UserSubscription struct {
 	EndTime   int64  `json:"end_time" gorm:"bigint;index;index:idx_user_sub_active,priority:3"`
 	Status    string `json:"status" gorm:"type:varchar(32);index;index:idx_user_sub_active,priority:2"` // active/expired/cancelled
 
-	Source string `json:"source" gorm:"type:varchar(32);default:'order'"` // order/admin
+	Source   string `json:"source" gorm:"type:varchar(64);default:'order';index"` // order/admin/register_default
+	GrantKey string `json:"grant_key,omitempty" gorm:"type:varchar(128);default:'';uniqueIndex:idx_user_sub_grant_key,priority:2"`
 
 	LastResetTime int64 `json:"last_reset_time" gorm:"type:bigint;default:0"`
 	NextResetTime int64 `json:"next_reset_time" gorm:"type:bigint;default:0;index"`
@@ -648,6 +649,70 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 		return fmt.Sprintf("用户分组将升级到 %s", plan.UpgradeGroup), nil
 	}
 	return "", nil
+}
+
+func GrantRegisterDefaultSubscription(userId int) (string, string, error) {
+	if userId <= 0 {
+		return "failed", "", errors.New("invalid userId")
+	}
+	if !common.RegisterDefaultSubscriptionEnabled {
+		return "skipped", "", nil
+	}
+	planId := common.RegisterDefaultSubscriptionPlanId
+	if planId <= 0 {
+		return "failed", "", errors.New("register default subscription plan is not configured")
+	}
+	source := "register_default"
+	grantKey := source
+	var upgradeGroup string
+	status := "created"
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var plan SubscriptionPlan
+		if err := tx.Where("id = ?", planId).First(&plan).Error; err != nil {
+			return err
+		}
+		if !plan.Enabled {
+			return errors.New("register default subscription plan is disabled")
+		}
+		var existing UserSubscription
+		result := tx.Where("user_id = ? AND grant_key = ?", userId, grantKey).Order("id desc").First(&existing)
+		if result.Error == nil {
+			status = "already_exists"
+			upgradeGroup = strings.TrimSpace(existing.UpgradeGroup)
+			return nil
+		}
+		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return result.Error
+		}
+		sub, err := CreateUserSubscriptionFromPlanTx(tx, userId, &plan, source)
+		if err != nil {
+			return err
+		}
+		sub.GrantKey = grantKey
+		if err = tx.Model(sub).Update("grant_key", grantKey).Error; err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+				status = "already_exists"
+				return nil
+			}
+			return err
+		}
+		upgradeGroup = strings.TrimSpace(sub.UpgradeGroup)
+		return nil
+	})
+	if err != nil {
+		return "failed", "", err
+	}
+	if status == "already_exists" && upgradeGroup == "" {
+		var existing UserSubscription
+		if err := DB.Where("user_id = ? AND grant_key = ?", userId, grantKey).Order("id desc").First(&existing).Error; err == nil {
+			upgradeGroup = strings.TrimSpace(existing.UpgradeGroup)
+		}
+	}
+	if upgradeGroup != "" {
+		_ = UpdateUserGroupCache(userId, upgradeGroup)
+		return status, fmt.Sprintf("用户分组将升级到 %s", upgradeGroup), nil
+	}
+	return status, "", nil
 }
 
 // GetAllActiveUserSubscriptions returns all active subscriptions for a user.

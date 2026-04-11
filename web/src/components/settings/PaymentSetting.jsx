@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState } from 'react';
-import { Card, Spin } from '@douyinfe/semi-ui';
+import { Banner, Card, Spin, Space, Tag } from '@douyinfe/semi-ui';
 import SettingsGeneralPayment from '../../pages/Setting/Payment/SettingsGeneralPayment';
 import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentGateway';
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
@@ -26,6 +26,68 @@ import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPay
 import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
+
+const PAY_METHOD_LABELS = {
+  wxpay: '微信支付',
+  alipay: '支付宝',
+  qqpay: 'QQ 钱包',
+  paypal: 'PayPal',
+  stripe: 'Stripe',
+  usdt: 'USDT',
+};
+
+const parsePayMethods = (rawPayMethods) => {
+  if (!rawPayMethods) {
+    return [];
+  }
+
+  try {
+    const parsedPayMethods = JSON.parse(rawPayMethods);
+    if (Array.isArray(parsedPayMethods)) {
+      return parsedPayMethods
+        .map((item) => {
+          if (typeof item === 'string') {
+            const methodType = item.trim();
+            if (!methodType) {
+              return null;
+            }
+            return {
+              type: methodType,
+              name: PAY_METHOD_LABELS[methodType] || methodType,
+            };
+          }
+
+          if (!item || typeof item !== 'object') {
+            return null;
+          }
+
+          const methodType =
+            typeof item.type === 'string' ? item.type.trim() : '';
+          const methodName =
+            typeof item.name === 'string' ? item.name.trim() : '';
+
+          if (!methodType && !methodName) {
+            return null;
+          }
+
+          return {
+            type: methodType || methodName,
+            name: methodName || PAY_METHOD_LABELS[methodType] || methodType,
+          };
+        })
+        .filter(Boolean);
+    }
+  } catch (error) {}
+
+  return rawPayMethods
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((methodType) => ({
+      type: methodType,
+      name: PAY_METHOD_LABELS[methodType] || methodType,
+    }));
+};
 
 const PaymentSetting = () => {
   const { t } = useTranslation();
@@ -81,6 +143,18 @@ const PaymentSetting = () => {
               newInputs['AmountOptions'] = item.value;
             }
             break;
+          case 'PayMethods':
+            try {
+              newInputs[item.key] = JSON.stringify(
+                JSON.parse(item.value),
+                null,
+                2,
+              );
+            } catch (error) {
+              console.error('解析PayMethods出错:', error);
+              newInputs[item.key] = item.value;
+            }
+            break;
           case 'payment_setting.amount_discount':
             try {
               newInputs['AmountDiscount'] = JSON.stringify(
@@ -129,9 +203,38 @@ const PaymentSetting = () => {
     onRefresh();
   }, []);
 
+  const renderPayMethods = () => {
+    const methods = parsePayMethods(inputs.PayMethods);
+
+    if (methods.length === 0) {
+      return <Tag color='red'>{t('未配置')}</Tag>;
+    }
+
+    return (
+      <Space wrap>
+        {methods.map((method, index) => (
+          <Tag key={`${method.type}-${index}`} color='blue'>
+            {method.name}
+          </Tag>
+        ))}
+      </Space>
+    );
+  };
+
   return (
     <>
       <Spin spinning={loading} size='large'>
+        <Banner
+          fullMode={false}
+          type='info'
+          title={t('支付方式概览')}
+          description={
+            <div>
+              {t('当前支付方式')}：{renderPayMethods()}
+            </div>
+          }
+          style={{ marginTop: '10px' }}
+        />
         <Card style={{ marginTop: '10px' }}>
           <SettingsGeneralPayment options={inputs} refresh={onRefresh} />
         </Card>

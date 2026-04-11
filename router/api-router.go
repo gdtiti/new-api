@@ -241,6 +241,7 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.GET("/tag/models", controller.GetTagModels)
 			channelRoute.POST("/copy/:id", controller.CopyChannel)
 			channelRoute.POST("/multi_key/manage", controller.ManageMultiKeys)
+			channelRoute.POST("/base_url/manage", controller.ManageChannelBaseURLs)
 			channelRoute.POST("/upstream_updates/apply", controller.ApplyChannelUpstreamModelUpdates)
 			channelRoute.POST("/upstream_updates/apply_all", controller.ApplyAllChannelUpstreamModelUpdates)
 			channelRoute.POST("/upstream_updates/detect", controller.DetectChannelUpstreamModelUpdates)
@@ -281,10 +282,18 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
+		temporaryUserRoute := apiRouter.Group("/temporary-user")
+		{
+			temporaryUserRoute.POST("/", middleware.AdminAuth(), controller.CreateTemporaryUser)
+			temporaryUserRoute.GET("/", middleware.RootAuth(), controller.GetTemporaryUsers)
+			temporaryUserRoute.POST("/manage", middleware.RootAuth(), controller.ManageTemporaryUser)
+		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		logRoute.DELETE("/", middleware.AdminAuth(), controller.DeleteHistoryLogs)
 		logRoute.GET("/stat", middleware.AdminAuth(), controller.GetLogsStat)
+		logRoute.GET("/analytics/channel", middleware.AdminAuth(), controller.GetChannelLogAnalytics)
+		logRoute.GET("/analytics/model", middleware.AdminAuth(), controller.GetModelLogAnalytics)
 		logRoute.GET("/self/stat", middleware.UserAuth(), controller.GetLogsSelfStat)
 		logRoute.GET("/channel_affinity_usage_cache", middleware.AdminAuth(), controller.GetChannelAffinityUsageCacheStats)
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)

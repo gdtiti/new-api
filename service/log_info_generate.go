@@ -1,6 +1,7 @@
 package service
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -11,6 +12,29 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func sanitizeBaseURLForAdminInfo(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u == nil || u.Scheme == "" || u.Host == "" {
+		// Best-effort: keep original, but strip query/fragment.
+		if idx := strings.IndexAny(raw, "?#"); idx != -1 {
+			raw = raw[:idx]
+		}
+		return strings.TrimSpace(raw)
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.Fragment = ""
+	return strings.TrimSpace(u.String())
+}
+
+func SanitizeBaseURLForAdminInfo(raw string) string {
+	return sanitizeBaseURLForAdminInfo(raw)
+}
 
 func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
 	if other == nil {
@@ -42,6 +66,12 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	other["model_price"] = modelPrice
 	other["user_group_ratio"] = userGroupRatio
 	other["frt"] = float64(relayInfo.FirstResponseTime.UnixMilli() - relayInfo.StartTime.UnixMilli())
+	if baseURLID := common.GetContextKeyInt(ctx, constant.ContextKeyChannelBaseUrlId); baseURLID > 0 {
+		other["base_url_id"] = baseURLID
+	}
+	if baseURLIndex := common.GetContextKeyInt(ctx, constant.ContextKeyChannelBaseUrlIndex); baseURLIndex > 0 {
+		other["base_url_index"] = baseURLIndex
+	}
 	if relayInfo.ReasoningEffort != "" {
 		other["reasoning_effort"] = relayInfo.ReasoningEffort
 	}
@@ -57,6 +87,9 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 
 	adminInfo := make(map[string]interface{})
 	adminInfo["use_channel"] = ctx.GetStringSlice("use_channel")
+	if baseURL := SanitizeBaseURLForAdminInfo(common.GetContextKeyString(ctx, constant.ContextKeyChannelBaseUrl)); baseURL != "" {
+		adminInfo["base_url"] = baseURL
+	}
 	isMultiKey := common.GetContextKeyBool(ctx, constant.ContextKeyChannelIsMultiKey)
 	if isMultiKey {
 		adminInfo["is_multi_key"] = true

@@ -34,6 +34,7 @@ import {
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import {
   Button,
+  Descriptions,
   Modal,
   SideSheet,
   Space,
@@ -53,6 +54,7 @@ import {
   IconClose,
   IconGift,
 } from '@douyinfe/semi-icons';
+import { REDEMPTION_GRANT_TYPE } from '../../../../constants/redemption.constants';
 
 const { Text, Title } = Typography;
 
@@ -66,14 +68,46 @@ const EditRedemptionModal = (props) => {
 
   const getInitValues = () => ({
     name: '',
+    grant_type: REDEMPTION_GRANT_TYPE.QUOTA,
     quota: 100000,
     amount: Number(quotaToDisplayAmount(100000).toFixed(6)),
     count: 1,
     expired_time: null,
   });
 
+  const truncateName = (text, max = 20) => {
+    const chars = Array.from(text || '');
+    return chars.slice(0, max).join('');
+  };
+
+  const getDefaultName = (values) => {
+    if (values.grant_type === REDEMPTION_GRANT_TYPE.SUBSCRIPTION) {
+      const selectedPlan = (subscriptionPlans || []).find(
+        (item) => item?.plan?.id === Number(values.subscription_plan_id),
+      );
+      return truncateName(selectedPlan?.plan?.title || t('订阅兑换码'));
+    }
+    return renderQuota(Number(values.quota) || 0);
+  };
+
   const handleCancel = () => {
     props.handleClose();
+  };
+
+  const loadSubscriptionPlans = async () => {
+    setPlansLoading(true);
+    try {
+      const res = await API.get('/api/subscription/admin/plans');
+      if (res.data?.success) {
+        setSubscriptionPlans(res.data.data || []);
+      } else {
+        setSubscriptionPlans([]);
+      }
+    } catch (error) {
+      setSubscriptionPlans([]);
+    } finally {
+      setPlansLoading(false);
+    }
   };
 
   const loadRedemption = async () => {
@@ -95,6 +129,10 @@ const EditRedemptionModal = (props) => {
   };
 
   useEffect(() => {
+    if (!props.visiable) {
+      return;
+    }
+    loadSubscriptionPlans();
     if (formApiRef.current) {
       if (isEdit) {
         loadRedemption();
@@ -102,12 +140,12 @@ const EditRedemptionModal = (props) => {
         formApiRef.current.setValues(getInitValues());
       }
     }
-  }, [props.editingRedemption.id]);
+  }, [props.visiable, props.editingRedemption.id]);
 
   const submit = async (values) => {
     let name = values.name;
     if (!isEdit && (!name || name === '')) {
-      name = renderQuota(values.quota);
+      name = getDefaultName(values);
     }
     setLoading(true);
     let localInputs = { ...values };
@@ -119,6 +157,12 @@ const EditRedemptionModal = (props) => {
       return;
     }
     localInputs.name = name;
+    delete localInputs.redeemed_count;
+    if (localInputs.grant_type === REDEMPTION_GRANT_TYPE.SUBSCRIPTION) {
+      localInputs.quota = 0;
+    } else {
+      localInputs.subscription_plan_id = 0;
+    }
     if (!localInputs.expired_time) {
       localInputs.expired_time = 0;
     } else {
@@ -226,6 +270,11 @@ const EditRedemptionModal = (props) => {
             initValues={getInitValues()}
             getFormApi={(api) => (formApiRef.current = api)}
             onSubmit={submit}
+            onSubmitFail={(errs) => {
+              const first = Object.values(errs)[0];
+              if (first) showError(Array.isArray(first) ? first[0] : first);
+              formApiRef.current?.scrollToError();
+            }}
           >
             {({ values }) => (
               <div className='p-2'>
@@ -278,7 +327,6 @@ const EditRedemptionModal = (props) => {
                 </Card>
 
                 <Card className='!rounded-2xl shadow-sm border-0'>
-                  {/* Header: Quota Settings */}
                   <div className='flex items-center mb-2'>
                     <Avatar
                       size='small'
@@ -289,10 +337,10 @@ const EditRedemptionModal = (props) => {
                     </Avatar>
                     <div>
                       <Text className='text-lg font-medium'>
-                        {t('额度设置')}
+                        {t('兑换内容')}
                       </Text>
                       <div className='text-xs text-gray-600'>
-                        {t('设置兑换码的额度和数量')}
+                        {t('设置兑换后发放的内容和最大兑换次数')}
                       </div>
                     </div>
                   </div>
@@ -379,6 +427,21 @@ const EditRedemptionModal = (props) => {
                       </Col>
                     )}
                   </Row>
+
+                  {values.grant_type === REDEMPTION_GRANT_TYPE.SUBSCRIPTION && (
+                    <Descriptions
+                      size='small'
+                      data={[
+                        {
+                          key: 'subscription_hint',
+                          value: t(
+                            '兑换成功后会为用户开通所选订阅套餐，不再直接增加钱包余额。',
+                          ),
+                        },
+                      ]}
+                      style={{ marginTop: 12 }}
+                    />
+                  )}
                 </Card>
               </div>
             )}
