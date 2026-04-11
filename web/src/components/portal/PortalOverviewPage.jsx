@@ -23,6 +23,7 @@ import {
   IconArrowRight,
   IconBolt,
   IconCreditCard,
+  IconKey,
   IconPieChartStroked,
   IconSafe,
 } from '@douyinfe/semi-icons';
@@ -95,6 +96,14 @@ const PortalOverviewPage = () => {
             <Button
               theme='solid'
               type='primary'
+              icon={<IconKey />}
+              onClick={overview.navigateToTokens}
+            >
+              {t('令牌中心')}
+            </Button>
+            <Button
+              theme='light'
+              type='primary'
               icon={<IconCreditCard />}
               onClick={overview.navigateToWallet}
             >
@@ -102,7 +111,7 @@ const PortalOverviewPage = () => {
             </Button>
             <Button
               theme='light'
-              type='tertiary'
+              type='secondary'
               icon={<IconSafe />}
               onClick={overview.navigateToSubscription}
             >
@@ -271,7 +280,9 @@ const PortalOverviewPage = () => {
             bordered={false}
           >
             <div className='portal-quick-action__icon'>
-              {item.key === 'wallet' ? (
+              {item.key === 'tokens' ? (
+                <IconKey />
+              ) : item.key === 'wallet' ? (
                 <IconCreditCard />
               ) : item.key === 'subscription' ? (
                 <IconSafe />

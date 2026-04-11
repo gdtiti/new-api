@@ -106,11 +106,19 @@ const getSubscriptionRemainDays = (subscription) => {
 
 const buildQuickActions = ({
   t,
+  navigateToTokens,
   navigateToWallet,
   navigateToSubscription,
   navigateToLogs,
   navigateToAnalytics,
 }) => [
+  {
+    key: 'tokens',
+    title: t('管理令牌中心'),
+    description: t('直接创建、复制、编辑与检查令牌，不再回到旧控制台找入口。'),
+    actionLabel: t('打开令牌中心'),
+    onClick: navigateToTokens,
+  },
   {
     key: 'wallet',
     title: t('查看钱包与额度'),
@@ -405,6 +413,10 @@ export const usePortalOverviewData = () => {
     () => navigate('/app/wallet'),
     [navigate],
   );
+  const navigateToTokens = useCallback(
+    () => navigate('/app/tokens'),
+    [navigate],
+  );
   const navigateToSubscription = useCallback(
     () => navigate('/app/subscription'),
     [navigate],
@@ -566,6 +578,7 @@ export const usePortalOverviewData = () => {
   const quickActions = useMemo(() => {
     return buildQuickActions({
       t,
+      navigateToTokens,
       navigateToWallet,
       navigateToSubscription,
       navigateToLogs: () => navigateToLogs(),
@@ -574,6 +587,7 @@ export const usePortalOverviewData = () => {
   }, [
     navigateToAnalytics,
     navigateToLogs,
+    navigateToTokens,
     navigateToSubscription,
     navigateToWallet,
     t,
@@ -618,6 +632,7 @@ export const usePortalOverviewData = () => {
     handleDateRangeChange,
     handleDefaultTimeChange,
     handleRefresh,
+    navigateToTokens,
     navigateToWallet,
     navigateToSubscription,
     navigateToAnalytics,

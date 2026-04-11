@@ -32,6 +32,7 @@ import {
   Boxes,
   CreditCard,
   FileText,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -46,10 +47,15 @@ import { API, getLogo, getSystemName, showSuccess } from '../../helpers';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
+import PortalThemePicker from './PortalThemePicker';
+import {
+  DEFAULT_PORTAL_SKIN,
+  getPortalSkin,
+  PORTAL_SKIN_STORAGE_KEY,
+  PORTAL_SIDEBAR_COLLAPSED_KEY,
+} from './portalSkin';
 
 const { Text, Title } = Typography;
-
-const PORTAL_SIDEBAR_COLLAPSED_KEY = 'portal_sidebar_collapsed';
 
 const PortalShell = () => {
   const [userState, userDispatch] = useContext(UserContext);
@@ -61,6 +67,9 @@ const PortalShell = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem(PORTAL_SIDEBAR_COLLAPSED_KEY) === 'true',
   );
+  const [skinKey, setSkinKey] = useState(
+    () => localStorage.getItem(PORTAL_SKIN_STORAGE_KEY) || DEFAULT_PORTAL_SKIN,
+  );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const systemName = getSystemName();
@@ -68,6 +77,7 @@ const PortalShell = () => {
   const user = userState?.user;
   const status = statusState?.status || {};
   const isAdmin = user && typeof user.role === 'number' && user.role >= 10;
+  const activeSkin = useMemo(() => getPortalSkin(skinKey), [skinKey]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -80,11 +90,22 @@ const PortalShell = () => {
     setMobileNavOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    localStorage.setItem(PORTAL_SKIN_STORAGE_KEY, activeSkin.key);
+  }, [activeSkin.key]);
+
   const navSections = useMemo(
     () => [
       {
-        label: t('经营概览'),
+        label: t('核心入口'),
         items: [
+          {
+            key: 'tokens',
+            title: t('令牌中心'),
+            description: t('直接进入令牌管理、批量操作与密钥查看'),
+            to: '/app/tokens',
+            icon: KeyRound,
+          },
           {
             key: 'overview',
             title: t('总览'),
@@ -212,7 +233,7 @@ const PortalShell = () => {
         key: 'coverage',
         label: t('覆盖能力'),
         value: `${navItems.length}`,
-        hint: t('总览、账单、日志、模型与账户能力已纳入统一门户'),
+        hint: t('令牌、总览、账单、日志、模型与账户能力已纳入统一门户'),
       },
       {
         key: 'status',
@@ -239,6 +260,36 @@ const PortalShell = () => {
     [navigate],
   );
 
+  const topLevelActions = useMemo(
+    () => [
+      {
+        key: 'tokens',
+        label: t('令牌中心'),
+        onClick: () => goTo('/app/tokens'),
+        type: 'primary',
+        theme: 'solid',
+        icon: <KeyRound size={16} />,
+      },
+      {
+        key: 'models',
+        label: t('模型广场'),
+        onClick: () => goTo('/app/models'),
+        type: 'primary',
+        theme: 'light',
+        icon: <Boxes size={16} />,
+      },
+      {
+        key: 'account',
+        label: t('账户与安全'),
+        onClick: () => goTo('/app/account'),
+        type: 'tertiary',
+        theme: 'borderless',
+        icon: <UserRound size={16} />,
+      },
+    ],
+    [goTo, t],
+  );
+
   const handleLogout = useCallback(async () => {
     await API.get('/api/user/logout');
     showSuccess(t('注销成功!'));
@@ -248,7 +299,11 @@ const PortalShell = () => {
   }, [navigate, t, userDispatch]);
 
   return (
-    <div className='portal-shell'>
+    <div
+      className='portal-shell'
+      data-portal-mode={activeSkin.mode}
+      data-portal-skin={activeSkin.key}
+    >
       <div className='blur-ball blur-ball-indigo portal-shell__blur portal-shell__blur--primary' />
       <div className='blur-ball blur-ball-teal portal-shell__blur portal-shell__blur--secondary' />
 
@@ -297,6 +352,33 @@ const PortalShell = () => {
         </button>
 
         <div className='portal-shell__nav'>
+          {!sidebarCollapsed && (
+            <div className='portal-shell__nav-featured'>
+              <div className='portal-shell__nav-featured-header'>
+                <div className='portal-shell__nav-featured-copy'>
+                  <span className='portal-shell__nav-featured-badge'>
+                    {t('主模块')}
+                  </span>
+                  <strong>{t('令牌中心已前置到门户一级导航')}</strong>
+                </div>
+                <KeyRound size={18} />
+              </div>
+              <p>
+                {t(
+                  '生成、查看、复制和批量管理令牌，现在都可以直接从这里进入，不再隐藏在旧控制台页面里。',
+                )}
+              </p>
+              <Button
+                icon={<ArrowUpRight size={16} />}
+                onClick={() => goTo('/app/tokens')}
+                theme='solid'
+                type='primary'
+              >
+                {t('打开令牌中心')}
+              </Button>
+            </div>
+          )}
+
           {navSections.map((section) => (
             <div className='portal-shell__nav-section' key={section.label}>
               {!sidebarCollapsed && (
@@ -392,6 +474,15 @@ const PortalShell = () => {
           </div>
 
           <div className='portal-shell__header-actions'>
+            <Button
+              icon={<KeyRound size={16} />}
+              onClick={() => goTo('/app/tokens')}
+              theme='solid'
+              type='primary'
+            >
+              {t('令牌中心')}
+            </Button>
+
             {isAdmin && (
               <Button
                 icon={<ShieldCheck size={16} />}
@@ -440,18 +531,34 @@ const PortalShell = () => {
         </header>
 
         <section className='portal-shell__hero'>
-          <div>
-            <Text className='portal-shell__eyebrow'>{t('统一客户门户')}</Text>
-            <Title heading={4} className='!mb-1'>
-              {t('在 {{module}} 中保持一致的客户体验', {
-                module: currentItem?.title || t('总览'),
-              })}
-            </Title>
-            <Text type='secondary'>
-              {t(
-                '围绕余额、订阅、日志与模型分析建立统一的信息架构、视觉风格和操作路径，减少页面跳转与信息割裂。',
-              )}
-            </Text>
+          <div className='portal-shell__hero-main'>
+            <div className='portal-shell__hero-copy'>
+              <Text className='portal-shell__eyebrow'>{t('统一客户门户')}</Text>
+              <Title heading={4} className='!mb-1'>
+                {t('在 {{module}} 中保持一致的客户体验', {
+                  module: currentItem?.title || t('总览'),
+                })}
+              </Title>
+              <Text type='secondary'>
+                {t(
+                  '围绕令牌、余额、订阅、日志与模型分析重组信息架构，把原来分散的入口收回到同一套门户视觉和操作路径里。',
+                )}
+              </Text>
+            </div>
+
+            <div className='portal-shell__hero-actions'>
+              {topLevelActions.map((action) => (
+                <Button
+                  key={action.key}
+                  icon={action.icon}
+                  onClick={action.onClick}
+                  theme={action.theme}
+                  type={action.type}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </div>
 
             <div className='portal-shell__hero-grid'>
               {heroStats.map((item) => (
@@ -464,18 +571,59 @@ const PortalShell = () => {
             </div>
           </div>
 
-          <div className='portal-shell__tags'>
-            {statusTags.length > 0 ? (
-              statusTags.map((tag) => (
-                <Tag color={tag.color} key={tag.text} shape='circle'>
-                  {tag.text}
+          <div className='portal-shell__hero-rail'>
+            <div className='portal-shell__hero-spotlight'>
+              <div className='portal-shell__hero-spotlight-header'>
+                <span className='portal-shell__hero-spotlight-badge'>
+                  {t('本轮重点')}
+                </span>
+                <KeyRound size={18} />
+              </div>
+              <strong>{t('令牌管理已经提升为门户主入口')}</strong>
+              <p>
+                {t(
+                  '新的导航、头部动作和总览快捷入口都会直接引导到令牌中心，模型广场和日志中心也围绕令牌路径继续联动。',
+                )}
+              </p>
+              <Button
+                icon={<ArrowUpRight size={16} />}
+                onClick={() => goTo('/app/tokens')}
+                theme='light'
+                type='primary'
+              >
+                {t('查看令牌工作区')}
+              </Button>
+            </div>
+
+            <div className='portal-shell__skin-panel'>
+              <div className='portal-shell__hero-spotlight-header'>
+                <div className='portal-shell__nav-featured-copy'>
+                  <span className='portal-shell__nav-featured-badge'>
+                    {t('皮肤切换')}
+                  </span>
+                  <strong>{t('多套门户主题可随时切换')}</strong>
+                </div>
+              </div>
+              <PortalThemePicker
+                onSelect={setSkinKey}
+                selectedSkinKey={activeSkin.key}
+                t={t}
+              />
+            </div>
+
+            <div className='portal-shell__tags'>
+              {statusTags.length > 0 ? (
+                statusTags.map((tag) => (
+                  <Tag color={tag.color} key={tag.text} shape='circle'>
+                    {tag.text}
+                  </Tag>
+                ))
+              ) : (
+                <Tag color='grey' shape='circle'>
+                  {t('基础认证已可用')}
                 </Tag>
-              ))
-            ) : (
-              <Tag color='grey' shape='circle'>
-                {t('基础认证已可用')}
-              </Tag>
-            )}
+              )}
+            </div>
           </div>
         </section>
 

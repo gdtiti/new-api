@@ -78,6 +78,12 @@ const PortalLogsPage = lazy(() => import('./components/portal/PortalLogsPage'));
 const PortalModelGalleryPage = lazy(
   () => import('./components/portal/PortalModelGalleryPage'),
 );
+const PortalTokensPage = lazy(
+  () => import('./components/portal/PortalTokensPage'),
+);
+const PortalAccountPage = lazy(
+  () => import('./components/portal/PortalAccountPage'),
+);
 
 function DynamicOAuth2Callback() {
   const { provider } = useParams();
@@ -334,6 +340,14 @@ function App() {
             }
           />
           <Route
+            path='tokens'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalTokensPage />
+              </Suspense>
+            }
+          />
+          <Route
             path='logs'
             element={
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
@@ -353,7 +367,7 @@ function App() {
             path='account'
             element={
               <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <PersonalSetting />
+                <PortalAccountPage />
               </Suspense>
             }
           />
