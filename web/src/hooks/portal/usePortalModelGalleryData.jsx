@@ -30,6 +30,7 @@ import {
 } from '../../helpers';
 import { TIME_OPTIONS } from '../../constants';
 import { useDashboardCharts } from '../dashboard/useDashboardCharts';
+import { getPortalChartTheme } from '../../components/portal/portalSkin';
 
 const PRESET_OPTIONS = [
   { key: '24h', label: '24h', seconds: 24 * 60 * 60 },
@@ -78,7 +79,7 @@ const buildActiveWindowLabel = (preset, t) => {
   return matched?.label || t('自定义');
 };
 
-export const usePortalModelGalleryData = () => {
+export const usePortalModelGalleryData = (portalSkinKey) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -107,6 +108,10 @@ export const usePortalModelGalleryData = () => {
     }
     return buildDateRangeFromPreset(initialPreset);
   });
+  const chartTheme = useMemo(
+    () => getPortalChartTheme(portalSkinKey),
+    [portalSkinKey],
+  );
 
   const dashboardCharts = useDashboardCharts(
     defaultTime,
@@ -118,6 +123,7 @@ export const usePortalModelGalleryData = () => {
     setLineData,
     setModelColors,
     t,
+    { chartTheme },
   );
 
   const syncSearchParams = useCallback(

@@ -31,6 +31,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { VChart } from '@visactor/react-vchart';
 import { useTranslation } from 'react-i18next';
+import { useOutletContext } from 'react-router-dom';
 import { CHART_CONFIG } from '../../constants/dashboard.constants';
 import { usePortalOverviewData } from '../../hooks/portal/usePortalOverviewData';
 import PortalTimeRangeBar from './PortalTimeRangeBar';
@@ -154,7 +155,8 @@ const renderQuickActions = (actions) => {
 
 const PortalAnalyticsPage = () => {
   const { t } = useTranslation();
-  const overview = usePortalOverviewData();
+  const { portalSkinKey } = useOutletContext() || {};
+  const overview = usePortalOverviewData(portalSkinKey);
 
   if (overview.loading) {
     return (

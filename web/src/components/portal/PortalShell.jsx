@@ -474,6 +474,12 @@ const PortalShell = () => {
           </div>
 
           <div className='portal-shell__header-actions'>
+            <PortalThemePicker
+              onSelect={setSkinKey}
+              selectedSkinKey={activeSkin.key}
+              t={t}
+            />
+
             <Button
               icon={<KeyRound size={16} />}
               onClick={() => goTo('/app/tokens')}
@@ -595,22 +601,6 @@ const PortalShell = () => {
               </Button>
             </div>
 
-            <div className='portal-shell__skin-panel'>
-              <div className='portal-shell__hero-spotlight-header'>
-                <div className='portal-shell__nav-featured-copy'>
-                  <span className='portal-shell__nav-featured-badge'>
-                    {t('皮肤切换')}
-                  </span>
-                  <strong>{t('多套门户主题可随时切换')}</strong>
-                </div>
-              </div>
-              <PortalThemePicker
-                onSelect={setSkinKey}
-                selectedSkinKey={activeSkin.key}
-                t={t}
-              />
-            </div>
-
             <div className='portal-shell__tags'>
               {statusTags.length > 0 ? (
                 statusTags.map((tag) => (
@@ -628,7 +618,9 @@ const PortalShell = () => {
         </section>
 
         <main className='portal-shell__content'>
-          <Outlet />
+          <Outlet
+            context={{ portalSkinKey: activeSkin.key, portalSkin: activeSkin }}
+          />
         </main>
       </div>
     </div>

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { initVChartSemiTheme } from '@visactor/vchart-semi-theme';
 import {
   modelColorMap,
@@ -35,6 +35,7 @@ import {
   updateMapValue,
   initializeMaps,
   processUserData,
+  applyChartThemeToSpec,
 } from '../../helpers/dashboard';
 
 const USER_COLORS = [
@@ -52,7 +53,10 @@ export const useDashboardCharts = (
   setLineData,
   setModelColors,
   t,
+  options = {},
 ) => {
+  const chartTheme = useMemo(() => options?.chartTheme || null, [options]);
+
   // ========== 图表规格状态 ==========
   const [spec_pie, setSpecPie] = useState({
     type: 'pie',
@@ -436,6 +440,7 @@ export const useDashboardCharts = (
         `${t('总计')}：${renderNumber(totalTimes)}`,
         newModelColors,
         'id0',
+        chartTheme,
       );
 
       updateChartSpec(
@@ -444,6 +449,7 @@ export const useDashboardCharts = (
         `${t('总计')}：${renderQuota(totalQuota, 2)}`,
         newModelColors,
         'barData',
+        chartTheme,
       );
 
       // ===== 模型调用次数折线图 =====
@@ -476,6 +482,7 @@ export const useDashboardCharts = (
         `${t('总计')}：${renderNumber(totalTimes)}`,
         newModelColors,
         'lineData',
+        chartTheme,
       );
 
       updateChartSpec(
@@ -484,6 +491,7 @@ export const useDashboardCharts = (
         `${t('总计')}：${renderNumber(totalTimes)}`,
         newModelColors,
         'rankData',
+        chartTheme,
       );
 
       setPieData(newPieData);
@@ -502,6 +510,7 @@ export const useDashboardCharts = (
       setConsumeQuota,
       setTimes,
       setConsumeTokens,
+      chartTheme,
       t,
     ],
   );
@@ -523,14 +532,24 @@ export const useDashboardCharts = (
 
       const totalUserQuota = rankingData.reduce((s, i) => s + i.Quota, 0);
 
-      setSpecUserRank((prev) => ({
-        ...prev,
-        data: [{ id: 'userRankData', values: userRankValues }],
-        title: {
-          ...prev.title,
-          subtext: `${t('总计')}：${renderQuota(totalUserQuota, 2)}`,
-        },
-      }));
+      setSpecUserRank((prev) =>
+        applyChartThemeToSpec(
+          {
+            ...prev,
+            data: [{ id: 'userRankData', values: userRankValues }],
+            title: {
+              ...prev.title,
+              subtext: `${t('总计')}：${renderQuota(totalUserQuota, 2)}`,
+            },
+            color: {
+              ...(prev.color || {}),
+              type: 'ordinal',
+              range: USER_COLORS,
+            },
+          },
+          chartTheme,
+        ),
+      );
 
       const userTrendValues = userTrend.map((item) => ({
         Time: item.Time,
@@ -539,16 +558,26 @@ export const useDashboardCharts = (
         Usage: item.Quota ? getQuotaWithUnit(item.Quota, 4) : 0,
       }));
 
-      setSpecUserTrend((prev) => ({
-        ...prev,
-        data: [{ id: 'userTrendData', values: userTrendValues }],
-        title: {
-          ...prev.title,
-          subtext: `${t('总计')}：${renderQuota(totalUserQuota, 2)}`,
-        },
-      }));
+      setSpecUserTrend((prev) =>
+        applyChartThemeToSpec(
+          {
+            ...prev,
+            data: [{ id: 'userTrendData', values: userTrendValues }],
+            title: {
+              ...prev.title,
+              subtext: `${t('总计')}：${renderQuota(totalUserQuota, 2)}`,
+            },
+            color: {
+              ...(prev.color || {}),
+              type: 'ordinal',
+              range: USER_COLORS,
+            },
+          },
+          chartTheme,
+        ),
+      );
     },
-    [dataExportDefaultTime, t],
+    [chartTheme, dataExportDefaultTime, t],
   );
 
   // ========== 初始化图表主题 ==========
@@ -557,6 +586,19 @@ export const useDashboardCharts = (
       isWatchingThemeSwitch: true,
     });
   }, []);
+
+  useEffect(() => {
+    if (!chartTheme) {
+      return;
+    }
+
+    setSpecPie((prev) => applyChartThemeToSpec(prev, chartTheme));
+    setSpecLine((prev) => applyChartThemeToSpec(prev, chartTheme));
+    setSpecModelLine((prev) => applyChartThemeToSpec(prev, chartTheme));
+    setSpecRankBar((prev) => applyChartThemeToSpec(prev, chartTheme));
+    setSpecUserRank((prev) => applyChartThemeToSpec(prev, chartTheme));
+    setSpecUserTrend((prev) => applyChartThemeToSpec(prev, chartTheme));
+  }, [chartTheme]);
 
   return {
     spec_pie,

@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import { Button, Card, Progress } from '@douyinfe/semi-ui';
+import { useOutletContext } from 'react-router-dom';
 import {
   IconActivity,
   IconArrowRight,
@@ -36,7 +37,8 @@ import PortalStateBlock from './PortalStateBlock';
 
 const PortalOverviewPage = () => {
   const { t } = useTranslation();
-  const overview = usePortalOverviewData();
+  const { portalSkinKey } = useOutletContext() || {};
+  const overview = usePortalOverviewData(portalSkinKey);
 
   if (overview.loading) {
     return (
@@ -180,7 +182,7 @@ const PortalOverviewPage = () => {
             percent={overview.subscriptionUsagePercent}
             showInfo
             format={(percent) => `${percent}%`}
-            stroke='#7c3aed'
+            stroke='var(--portal-accent)'
           />
           <div className='portal-overview__subscription-meta'>
             <span>

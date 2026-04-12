@@ -91,3 +91,49 @@ export const PORTAL_SKIN_MAP = PORTAL_SKINS.reduce((acc, skin) => {
 
 export const getPortalSkin = (skinKey) =>
   PORTAL_SKIN_MAP[skinKey] || PORTAL_SKIN_MAP[DEFAULT_PORTAL_SKIN];
+
+const buildPortalChartPalette = (skin) => {
+  const darkPalette = {
+    pulse: ['#ff5c93', '#9f7aea', '#38bdf8', '#f59e0b', '#34d399', '#f87171'],
+    summit: ['#60a5fa', '#22d3ee', '#38bdf8', '#f59e0b', '#34d399', '#a78bfa'],
+    mist: ['#4ade80', '#38bdf8', '#2dd4bf', '#fbbf24', '#60a5fa', '#fb7185'],
+  };
+  const lightPalette = {
+    pulse: ['#ff4d8d', '#7c3aed', '#2563eb', '#f97316', '#16a34a', '#e11d48'],
+    summit: ['#2563eb', '#0f766e', '#0284c7', '#d97706', '#16a34a', '#7c3aed'],
+    mist: ['#2f855a', '#3b82f6', '#0f766e', '#d97706', '#2563eb', '#db2777'],
+  };
+
+  const paletteGroup = skin.mode === 'dark' ? darkPalette : lightPalette;
+  return paletteGroup[skin.family] || paletteGroup.summit;
+};
+
+export const getPortalChartTheme = (skinKey) => {
+  const skin = getPortalSkin(skinKey);
+  const isDark = skin.mode === 'dark';
+
+  return {
+    skinKey: skin.key,
+    palette: buildPortalChartPalette(skin),
+    titleColor: isDark ? '#f4f8ff' : '#142033',
+    subtextColor: isDark ? '#b7c8dc' : '#5c6e86',
+    axisTextColor: isDark ? '#cad8ea' : '#54657d',
+    legendTextColor: isDark ? '#e6eef9' : '#1b2a40',
+    labelColor: isDark ? '#f4f8ff' : '#142033',
+    gridColor: isDark
+      ? 'rgba(148, 163, 184, 0.16)'
+      : 'rgba(100, 116, 139, 0.14)',
+    axisLineColor: isDark
+      ? 'rgba(148, 163, 184, 0.2)'
+      : 'rgba(100, 116, 139, 0.18)',
+    tooltipBackground: isDark
+      ? 'rgba(9, 18, 32, 0.94)'
+      : 'rgba(255, 255, 255, 0.96)',
+    tooltipBorderColor: isDark
+      ? 'rgba(148, 163, 184, 0.22)'
+      : 'rgba(37, 99, 235, 0.12)',
+    tooltipTextColor: isDark ? '#f8fbff' : '#142033',
+    hoverStroke: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(15, 23, 42, 0.18)',
+    areaOpacity: isDark ? 0.22 : 0.18,
+  };
+};

@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import { Button, Card } from '@douyinfe/semi-ui';
+import { useOutletContext } from 'react-router-dom';
 import {
   IconActivity,
   IconArrowRight,
@@ -86,7 +87,8 @@ const renderModelInsightList = (items, emptyTitle, emptyDescription, t) => {
 
 const PortalModelGalleryPage = () => {
   const { t } = useTranslation();
-  const gallery = usePortalModelGalleryData();
+  const { portalSkinKey } = useOutletContext() || {};
+  const gallery = usePortalModelGalleryData(portalSkinKey);
 
   if (gallery.loading) {
     return (
