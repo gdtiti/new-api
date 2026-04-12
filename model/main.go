@@ -195,6 +195,10 @@ func InitDB() (err error) {
 		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
+		if err := ensureRuntimeSchemaCompatibility(); err != nil {
+			return err
+		}
+
 		if !common.IsMasterNode {
 			return nil
 		}
@@ -380,6 +384,40 @@ func migrateLOGDB() error {
 		return err
 	}
 	return nil
+}
+
+func ensureRuntimeSchemaCompatibility() error {
+	if err := ensureMissingColumn(&Channel{}, "channels", "max_concurrency"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ensureMissingColumn(model interface{}, tableName string, columnName string) error {
+	if !DB.Migrator().HasTable(tableName) {
+		return nil
+	}
+	if DB.Migrator().HasColumn(model, columnName) {
+		return nil
+	}
+	if err := DB.Migrator().AddColumn(model, columnName); err != nil {
+		if isDuplicateColumnError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to add missing column %s.%s: %w", tableName, columnName, err)
+	}
+	common.SysLog(fmt.Sprintf("added missing column %s.%s for runtime compatibility", tableName, columnName))
+	return nil
+}
+
+func isDuplicateColumnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "duplicate column") ||
+		strings.Contains(message, "duplicate column name") ||
+		strings.Contains(message, "already exists")
 }
 
 func migrateRedemptionEnhancements() error {
