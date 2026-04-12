@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@douyinfe/semi-ui';
 import {
@@ -61,6 +61,9 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
   // UI state
   const [compactMode, setCompactMode] = useTableCompactMode('tokens');
   const [showKeys, setShowKeys] = useState({});
+  const [resolvedTokenKeys, setResolvedTokenKeys] = useState({});
+  const [loadingTokenKeys, setLoadingTokenKeys] = useState({});
+  const keyRequestsRef = useRef({});
 
   // Form state
   const [formApi, setFormApi] = useState(null);
@@ -472,6 +475,8 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
     setCompactMode,
     showKeys,
     setShowKeys,
+    resolvedTokenKeys,
+    loadingTokenKeys,
 
     // Form state
     formApi,

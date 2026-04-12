@@ -130,6 +130,9 @@ const renderTokenKey = (
   t,
 ) => {
   const revealed = !!showKeys[record.id];
+  const fullKey = resolvedTokenKeys?.[record.id] || '';
+  const maskedKey = record?.key || text || '';
+  const loading = !!loadingTokenKeys?.[record.id];
 
   return (
     <div className='w-[200px]'>
@@ -147,7 +150,7 @@ const renderTokenKey = (
               aria-label='toggle token visibility'
               onClick={(e) => {
                 e.stopPropagation();
-                setShowKeys((prev) => ({ ...prev, [record.id]: !revealed }));
+                void toggleTokenVisibility(record);
               }}
             />
             <Dropdown
@@ -498,6 +501,7 @@ export const getTokensColumns = ({
     },
     {
       title: t('密钥'),
+      dataIndex: 'key',
       key: 'token_key',
       render: (text, record) =>
         renderTokenKey(
