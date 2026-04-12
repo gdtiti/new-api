@@ -21,7 +21,7 @@ import React from 'react';
 import PricingTopSection from '../header/PricingTopSection';
 import PricingView from './PricingView';
 
-const PricingContent = ({ isMobile, sidebarProps, ...props }) => {
+const PricingContent = ({ isMobile, sidebarProps, compactHeader = false, ...props }) => {
   return (
     <div
       className={isMobile ? 'pricing-content-mobile' : 'pricing-scroll-hide'}
@@ -30,6 +30,7 @@ const PricingContent = ({ isMobile, sidebarProps, ...props }) => {
       <div className='pricing-search-header'>
         <PricingTopSection
           {...props}
+          compactHeader={compactHeader}
           isMobile={isMobile}
           sidebarProps={sidebarProps}
           showWithRecharge={sidebarProps.showWithRecharge}

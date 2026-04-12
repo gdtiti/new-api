@@ -220,65 +220,11 @@ const PortalShell = () => {
     t,
   ]);
 
-  const heroStats = useMemo(
-    () => [
-      {
-        key: 'module',
-        label: t('当前模块'),
-        value: currentItem?.title || t('总览'),
-        hint: currentItem?.description || t('统一查看客户侧经营与账户信息'),
-      },
-      {
-        key: 'coverage',
-        label: t('覆盖能力'),
-        value: `${navItems.length}`,
-        hint: t('令牌、总览、账单、日志、模型与账户能力已纳入统一门户'),
-      },
-      {
-        key: 'status',
-        label: t('接入状态'),
-        value: statusTags.length ? t('多能力已启用') : t('基础能力可用'),
-        hint: statusTags.length
-          ? t('认证、支付与第三方入口会按系统配置动态展示')
-          : t('登录与基础客户能力已就绪，可继续按模块深入使用'),
-      },
-    ],
-    [
-      currentItem?.description,
-      currentItem?.title,
-      navItems.length,
-      statusTags.length,
-      t,
-    ],
-  );
-
   const goTo = useCallback(
     (to) => {
       navigate(to);
     },
     [navigate],
-  );
-
-  const topLevelActions = useMemo(
-    () => [
-      {
-        key: 'tokens',
-        label: t('令牌中心'),
-        onClick: () => goTo('/app/tokens'),
-        type: 'primary',
-        theme: 'solid',
-        icon: <KeyRound size={16} />,
-      },
-      {
-        key: 'analytics',
-        label: t('数据分析'),
-        onClick: () => goTo('/app/analytics'),
-        type: 'primary',
-        theme: 'light',
-        icon: <BarChart3 size={16} />,
-      },
-    ],
-    [goTo, t],
   );
 
   const handleLogout = useCallback(async () => {
@@ -372,12 +318,7 @@ const PortalShell = () => {
                       </span>
                       {!sidebarCollapsed && (
                         <span className='portal-shell__nav-copy'>
-                          <span className='portal-shell__nav-title'>
-                            {item.title}
-                          </span>
-                          <span className='portal-shell__nav-description'>
-                            {item.description}
-                          </span>
+                          <span className='portal-shell__nav-title'>{item.title}</span>
                         </span>
                       )}
                     </button>
@@ -431,6 +372,15 @@ const PortalShell = () => {
               <Text type='secondary'>
                 {currentItem?.description || t('统一查看客户侧经营与账户信息')}
               </Text>
+              {statusTags.length > 0 ? (
+                <div className='portal-shell__title-meta'>
+                  {statusTags.map((tag) => (
+                    <Tag color={tag.color} key={tag.text} shape='circle' size='small'>
+                      {tag.text}
+                    </Tag>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -487,80 +437,6 @@ const PortalShell = () => {
             </Button>
           </div>
         </header>
-
-        <section className='portal-shell__hero'>
-          <div className='portal-shell__hero-main'>
-            <div className='portal-shell__hero-copy'>
-              <Text className='portal-shell__eyebrow'>{t('统一客户门户')}</Text>
-              <Title heading={4} className='!mb-1'>
-                {t('让 {{module}} 和账户、数据、动作保持同一套节奏', {
-                  module: currentItem?.title || t('总览'),
-                })}
-              </Title>
-              <Text type='secondary'>
-                {t(
-                  '导航、统计卡、图表和操作入口已经按同一套门户语言重新组织，减少跳转负担，也让每个页面的节奏更统一。',
-                )}
-              </Text>
-            </div>
-
-            <div className='portal-shell__hero-actions'>
-              {topLevelActions.map((action) => (
-                <Button
-                  key={action.key}
-                  icon={action.icon}
-                  onClick={action.onClick}
-                  theme={action.theme}
-                  type={action.type}
-                >
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-
-            <div className='portal-shell__hero-grid'>
-              {heroStats.map((item) => (
-                <div className='portal-shell__hero-stat' key={item.key}>
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                  <small>{item.hint}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className='portal-shell__hero-rail'>
-            <div className='portal-shell__hero-focus'>
-              <span className='portal-shell__hero-focus-label'>
-                {t('当前重点')}
-              </span>
-              <strong>{currentItem?.title || t('总览')}</strong>
-              <p>
-                {currentItem?.description ||
-                  t('统一查看客户侧经营与账户信息')}
-              </p>
-            </div>
-
-            <div className='portal-shell__hero-focus portal-shell__hero-focus--tags'>
-              <span className='portal-shell__hero-focus-label'>
-                {t('账户状态')}
-              </span>
-              <div className='portal-shell__tags'>
-                {statusTags.length > 0 ? (
-                  statusTags.map((tag) => (
-                    <Tag color={tag.color} key={tag.text} shape='circle'>
-                      {tag.text}
-                    </Tag>
-                  ))
-                ) : (
-                  <Tag color='grey' shape='circle'>
-                    {t('基础认证已可用')}
-                  </Tag>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
 
         <main className='portal-shell__content'>
           <Outlet

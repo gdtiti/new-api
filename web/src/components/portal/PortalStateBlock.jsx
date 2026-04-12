@@ -37,6 +37,7 @@ const PortalStateBlock = ({
   title,
   description,
   actionLabel,
+  actionIcon,
   onAction,
   compact = false,
   contained = true,
@@ -102,7 +103,7 @@ const PortalStateBlock = ({
           className='portal-state-block__action'
           theme='light'
           type='primary'
-          icon={<IconRefresh />}
+          icon={actionIcon || <IconRefresh />}
           onClick={onAction}
         >
           {actionLabel || t('重新加载')}

@@ -21,12 +21,8 @@ import { Button, Card } from '@douyinfe/semi-ui';
 import {
   IconArrowRight,
   IconBolt,
-  IconCreditCard,
   IconHistogram,
-  IconKey,
-  IconPieChartStroked,
   IconPulse,
-  IconSafe,
 } from '@douyinfe/semi-icons';
 import { VChart } from '@visactor/react-vchart';
 import { useTranslation } from 'react-i18next';
@@ -35,22 +31,6 @@ import { CHART_CONFIG } from '../../constants/dashboard.constants';
 import { usePortalOverviewData } from '../../hooks/portal/usePortalOverviewData';
 import PortalTimeRangeBar from './PortalTimeRangeBar';
 import PortalStateBlock from './PortalStateBlock';
-
-const getQuickActionIcon = (key) => {
-  if (key === 'tokens') {
-    return <IconKey />;
-  }
-  if (key === 'wallet') {
-    return <IconCreditCard />;
-  }
-  if (key === 'subscription') {
-    return <IconSafe />;
-  }
-  if (key === 'logs') {
-    return <IconBolt />;
-  }
-  return <IconPieChartStroked />;
-};
 
 const renderRankingList = (items, field, valueField, emptyText, onJump, t) => {
   if (!items.length) {
@@ -124,34 +104,6 @@ const renderInsightList = (items, t) => {
   );
 };
 
-const renderQuickActions = (actions) => {
-  return (
-    <div className='portal-analytics__actions'>
-      {actions.map((item) => (
-        <Card
-          key={item.key}
-          className='portal-panel portal-analytics__action'
-          bordered={false}
-        >
-          <div className='portal-analytics__action-icon'>
-            {getQuickActionIcon(item.key)}
-          </div>
-          <strong>{item.title}</strong>
-          <p>{item.description}</p>
-          <Button
-            theme='light'
-            type='primary'
-            onClick={item.onClick}
-            icon={<IconArrowRight />}
-          >
-            {item.actionLabel}
-          </Button>
-        </Card>
-      ))}
-    </div>
-  );
-};
-
 const PortalAnalyticsPage = () => {
   const { t } = useTranslation();
   const { portalSkinKey } = useOutletContext() || {};
@@ -182,11 +134,20 @@ const PortalAnalyticsPage = () => {
   const topQuotaModel = overview.quotaRanking?.[0]?.type || '';
   const focusModel = topRequestModel || topQuotaModel;
   const activeWindowLabel = `${overview.dateRange?.[0] || '-'} ~ ${overview.dateRange?.[1] || '-'}`;
-  const focusModelDescription = topRequestModel
-    ? t('当前调用最频繁，适合继续查看日志明细。')
-    : topQuotaModel
-      ? t('当前消耗占比较高，适合继续查看模型详情。')
-      : t('当有模型使用数据后，这里会自动突出重点。');
+  const focusModelDescription = focusModel
+    ? t('重点模型：{{model}}', { model: focusModel })
+    : t('当前窗口内还没有形成重点模型。');
+  const headerDescription = t('当前窗口：{{window}} · 粒度：{{granularity}} · {{focus}}', {
+    window: activeWindowLabel,
+    granularity: overview.defaultTime || t('自定义'),
+    focus: focusModelDescription,
+  });
+  const analyticsMetricCards = overview.analyticsMetricCards.slice(0, 3);
+  const showRequestRanking = (overview.requestRanking?.length || 0) > 0;
+  const showQuotaRanking = (overview.quotaRanking?.length || 0) > 0;
+  const showInsights = (overview.insights?.length || 0) > 0;
+  const showSecondarySections =
+    showRequestRanking || showQuotaRanking || showInsights;
 
   const chartCards = [
     {
@@ -229,63 +190,34 @@ const PortalAnalyticsPage = () => {
         onRefresh={overview.handleRefresh}
       />
 
-      <Card
-        className='portal-panel portal-detail-panel portal-analytics__hero'
-        bordered={false}
-      >
-        <div className='portal-analytics__hero-content'>
-          <div>
-            <div className='portal-overview__eyebrow'>{t('数据分析')}</div>
-            <h1 className='portal-overview__hero-title'>
-              {t('把趋势、排行和下一步动作放到同一个分析工作台')}
-            </h1>
-            <p className='portal-overview__hero-description'>
-              {t(
-                '这里保留最关键的两张主图，再配合排行、洞察和操作入口，方便先看走势，再继续排查具体模型。',
-              )}
-            </p>
-          </div>
-          <div className='portal-analytics__hero-actions'>
-            <Button
-              theme='solid'
-              type='primary'
-              icon={<IconBolt />}
-              onClick={() =>
-                overview.navigateToLogs(
-                  focusModel ? { model_name: focusModel } : {},
-                )
-              }
-            >
-              {focusModel ? t('查看重点模型日志') : t('查看完整日志')}
-            </Button>
-            <Button
-              theme='light'
-              type='primary'
-              icon={<IconArrowRight />}
-              onClick={() => overview.navigateToModel(focusModel)}
-            >
-              {focusModel ? t('打开重点模型') : t('查看模型广场')}
-            </Button>
-          </div>
+      <div className='portal-page-head'>
+        <div className='portal-page-head__main'>
+          <div className='portal-page-head__eyebrow'>{t('数据分析')}</div>
+          <h1 className='portal-page-head__title'>
+            {t('直接查看趋势、排行与重点模型')}
+          </h1>
+          <p className='portal-page-head__description'>
+            {headerDescription}
+          </p>
         </div>
-        <div className='portal-analytics__hero-side'>
-          <div className='portal-analytics__hero-kpi'>
-            <span>{t('当前分析窗口')}</span>
-            <strong>{activeWindowLabel}</strong>
-            <small>
-              {overview.defaultTime || t('按自定义时间范围统计')}
-            </small>
-          </div>
-          <div className='portal-analytics__hero-kpi'>
-            <span>{t('当前重点模型')}</span>
-            <strong>{focusModel || t('暂无数据')}</strong>
-            <small>{focusModelDescription}</small>
-          </div>
+        <div className='portal-page-head__actions'>
+          <Button
+            theme='solid'
+            type='primary'
+            icon={<IconBolt />}
+            onClick={() =>
+              overview.navigateToLogs(
+                focusModel ? { model_name: focusModel } : {},
+              )
+            }
+          >
+            {focusModel ? t('查看重点模型日志') : t('查看完整日志')}
+          </Button>
         </div>
-      </Card>
+      </div>
 
       <div className='portal-analytics__metrics'>
-        {overview.analyticsMetricCards.map((item) => (
+        {analyticsMetricCards.map((item) => (
           <Card
             key={item.key}
             className='portal-panel portal-analytics__metric'
@@ -337,87 +269,111 @@ const PortalAnalyticsPage = () => {
         ))}
       </div>
 
-      <div className='portal-analytics__content-grid'>
-        <Card
-          className='portal-panel portal-detail-panel portal-analytics__section-card'
-          bordered={false}
-        >
-          <div className='portal-analytics__section-head'>
-            <div>
-              <div className='portal-overview__eyebrow'>{t('高频模型')}</div>
-              <h2>{t('按调用次数排序')}</h2>
-              <p className='portal-analytics__section-description'>
-                {t('适合从最活跃的模型开始追查具体日志和调用来源。')}
-              </p>
-            </div>
-          </div>
-          {renderRankingList(
-            overview.requestRanking,
-            'Model',
-            'Count',
-            t('当前筛选窗口内还没有模型调用数据。'),
-            (modelName) => overview.navigateToLogs({ model_name: modelName }),
-            t,
-          )}
-        </Card>
+      {showSecondarySections ? (
+        <>
+          {(showRequestRanking || showQuotaRanking) ? (
+            <div
+              className={`portal-analytics__content-grid${showRequestRanking && showQuotaRanking ? '' : ' portal-analytics__content-grid--single'}`}
+            >
+              {showRequestRanking ? (
+                <Card
+                  className='portal-panel portal-detail-panel portal-analytics__section-card'
+                  bordered={false}
+                >
+                  <div className='portal-analytics__section-head'>
+                    <div>
+                      <div className='portal-overview__eyebrow'>
+                        {t('高频模型')}
+                      </div>
+                      <h2>{t('按调用次数排序')}</h2>
+                      <p className='portal-analytics__section-description'>
+                        {t('适合从最活跃的模型开始追查具体日志和调用来源。')}
+                      </p>
+                    </div>
+                  </div>
+                  {renderRankingList(
+                    overview.requestRanking,
+                    'Model',
+                    'Count',
+                    t('当前筛选窗口内还没有模型调用数据。'),
+                    (modelName) =>
+                      overview.navigateToLogs({ model_name: modelName }),
+                    t,
+                  )}
+                </Card>
+              ) : null}
 
-        <Card
-          className='portal-panel portal-detail-panel portal-analytics__section-card'
-          bordered={false}
-        >
-          <div className='portal-analytics__section-head'>
-            <div>
-              <div className='portal-overview__eyebrow'>{t('高消耗模型')}</div>
-              <h2>{t('按模型调用占比排序')}</h2>
-              <p className='portal-analytics__section-description'>
-                {t('适合先看占比较高的模型，判断是否需要切换或限制。')}
-              </p>
+              {showQuotaRanking ? (
+                <Card
+                  className='portal-panel portal-detail-panel portal-analytics__section-card'
+                  bordered={false}
+                >
+                  <div className='portal-analytics__section-head'>
+                    <div>
+                      <div className='portal-overview__eyebrow'>
+                        {t('高消耗模型')}
+                      </div>
+                      <h2>{t('按模型调用占比排序')}</h2>
+                      <p className='portal-analytics__section-description'>
+                        {t('适合先看占比较高的模型，判断是否需要切换或限制。')}
+                      </p>
+                    </div>
+                  </div>
+                  {renderRankingList(
+                    overview.quotaRanking,
+                    'type',
+                    'value',
+                    t('当前筛选窗口内还没有模型占比数据。'),
+                    (modelName) => overview.navigateToModel(modelName),
+                    t,
+                  )}
+                </Card>
+              ) : null}
             </div>
-          </div>
-          {renderRankingList(
-            overview.quotaRanking,
-            'type',
-            'value',
-            t('当前筛选窗口内还没有模型占比数据。'),
-            (modelName) => overview.navigateToModel(modelName),
-            t,
-          )}
-        </Card>
-      </div>
+          ) : null}
 
-      <div className='portal-analytics__content-grid'>
+          {showInsights ? (
+            <div className='portal-analytics__content-grid portal-analytics__content-grid--single'>
+              <Card
+                className='portal-panel portal-detail-panel portal-analytics__section-card'
+                bordered={false}
+              >
+                <div className='portal-analytics__section-head'>
+                  <div>
+                    <div className='portal-overview__eyebrow'>{t('经营洞察')}</div>
+                    <h2>{t('现在最值得处理的事情')}</h2>
+                    <p className='portal-analytics__section-description'>
+                      {t('根据余额、订阅和模型使用情况，直接给出下一步动作。')}
+                    </p>
+                  </div>
+                </div>
+                {renderInsightList(overview.insights, t)}
+              </Card>
+            </div>
+          ) : null}
+        </>
+      ) : (
         <Card
           className='portal-panel portal-detail-panel portal-analytics__section-card'
           bordered={false}
         >
           <div className='portal-analytics__section-head'>
             <div>
-              <div className='portal-overview__eyebrow'>{t('经营洞察')}</div>
-              <h2>{t('现在最值得处理的事情')}</h2>
+              <div className='portal-overview__eyebrow'>{t('补充数据')}</div>
+              <h2>{t('当前窗口还没有足够的统计结果')}</h2>
               <p className='portal-analytics__section-description'>
-                {t('根据余额、订阅和模型使用情况，直接给出下一步动作。')}
+                {t('先切换时间范围，或到日志页产生真实调用后再回来查看。')}
               </p>
             </div>
           </div>
-          {renderInsightList(overview.insights, t)}
+          <PortalStateBlock
+            compact
+            contained={false}
+            title={t('暂无排行与经营提醒')}
+            description={t('主图会优先保留，排行和提醒会在有真实数据后再展开。')}
+          />
         </Card>
-
-        <Card
-          className='portal-panel portal-detail-panel portal-analytics__section-card'
-          bordered={false}
-        >
-          <div className='portal-analytics__section-head'>
-            <div>
-              <div className='portal-overview__eyebrow'>{t('下一步')}</div>
-              <h2>{t('常用入口')}</h2>
-              <p className='portal-analytics__section-description'>
-                {t('只保留分析后最常继续的入口，避免页面里同时出现过多动作卡。')}
-              </p>
-            </div>
-          </div>
-          {renderQuickActions(overview.quickActions.slice(0, 2))}
-        </Card>
-      </div>
+      )}
     </div>
   );
 };

@@ -43,9 +43,9 @@ const MjLogsActions = ({
   );
 
   return (
-    <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
+    <div className='portal-logs__stats flex flex-col md:flex-row justify-between items-start md:items-center gap-3 w-full'>
       <Skeleton loading={showSkeleton} active placeholder={placeholder}>
-        <div className='flex items-center mb-2 md:mb-0'>
+        <div className='portal-logs__banner flex items-center mb-2 md:mb-0'>
           <IconEyeOpened className='mr-2' />
           <Text>
             {isAdminUser && showBanner
@@ -57,11 +57,13 @@ const MjLogsActions = ({
         </div>
       </Skeleton>
 
-      <CompactModeToggle
-        compactMode={compactMode}
-        setCompactMode={setCompactMode}
-        t={t}
-      />
+      <div className='portal-logs__toggle'>
+        <CompactModeToggle
+          compactMode={compactMode}
+          setCompactMode={setCompactMode}
+          t={t}
+        />
+      </div>
     </div>
   );
 };

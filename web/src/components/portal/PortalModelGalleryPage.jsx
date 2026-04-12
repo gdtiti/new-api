@@ -19,13 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { Button, Card } from '@douyinfe/semi-ui';
 import { useOutletContext } from 'react-router-dom';
-import {
-  IconActivity,
-  IconArrowRight,
-  IconList,
-  IconPulse,
-  IconSearch,
-} from '@douyinfe/semi-icons';
+import { IconSearch } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import PricingPage from '../table/model-pricing/layout/PricingPage';
 import PortalTimeRangeBar from './PortalTimeRangeBar';
@@ -59,24 +53,14 @@ const renderModelInsightList = (items, emptyTitle, emptyDescription, t) => {
           </div>
           <div className='portal-model-gallery__insight-side'>
             <span>{item.value}</span>
-            <div className='portal-model-gallery__insight-actions'>
-              <Button
-                theme='light'
-                type='primary'
-                icon={<IconSearch />}
-                onClick={item.onOpenModel}
-              >
-                {t('模型详情')}
-              </Button>
-              <Button
-                theme='borderless'
-                type='tertiary'
-                icon={<IconArrowRight />}
-                onClick={item.onOpenLogs}
-              >
-                {t('查看日志')}
-              </Button>
-            </div>
+            <Button
+              theme='light'
+              type='primary'
+              icon={<IconSearch />}
+              onClick={item.onOpenModel}
+            >
+              {t('查看详情')}
+            </Button>
           </div>
         </div>
       ))}
@@ -111,6 +95,13 @@ const PortalModelGalleryPage = () => {
   }
 
   const heroModel = gallery.topRequestModel || gallery.topQuotaModel;
+  const metricCards = gallery.metricCards.slice(0, 3);
+  const showFavoriteModels = gallery.favoriteModels.length > 0;
+  const showConsumptionModels = gallery.consumptionModels.length > 0;
+  const showInsightSections = showFavoriteModels || showConsumptionModels;
+  const showMetricCards = showInsightSections;
+  const currentCustomerName =
+    gallery.user?.display_name || gallery.user?.username || t('当前客户');
 
   return (
     <div className='portal-model-gallery'>
@@ -127,170 +118,133 @@ const PortalModelGalleryPage = () => {
         onRefresh={gallery.handleRefresh}
       />
 
-      <Card
-        className='portal-panel portal-model-gallery__hero'
-        bordered={false}
-      >
-        <div className='portal-model-gallery__hero-content'>
-          <div>
-            <div className='portal-overview__eyebrow'>{t('模型广场')}</div>
-            <h1 className='portal-overview__hero-title'>
-              {t('为 {{name}} 推荐更合适的模型组合', {
-                name:
-                  gallery.user?.display_name ||
-                  gallery.user?.username ||
-                  t('当前客户'),
-              })}
-            </h1>
-            <p className='portal-overview__hero-description'>
-              {t(
-                '这里把模型目录、高频模型和高消耗模型按同一套节奏整理在一起，先看重点，再继续筛选、对比和追踪日志。',
-              )}
-            </p>
-          </div>
-          <div className='portal-model-gallery__hero-actions'>
+      <div className='portal-page-head'>
+        <div className='portal-page-head__main'>
+          <div className='portal-page-head__eyebrow'>{t('模型广场')}</div>
+          <h1 className='portal-page-head__title'>
+            {t('直接查看 {{name}} 的重点模型', {
+              name: currentCustomerName,
+            })}
+          </h1>
+          <p className='portal-page-head__description'>
+            {heroModel
+              ? t('当前窗口 {{window}} · 重点模型 {{model}}', {
+                  window: gallery.activeWindowLabel,
+                  model: heroModel,
+                })
+              : t('当前窗口 {{window}}，有真实调用后再突出重点模型。', {
+                  window: gallery.activeWindowLabel,
+                })}
+          </p>
+        </div>
+        {heroModel ? (
+          <div className='portal-page-head__actions'>
             <Button
               theme='solid'
               type='primary'
               icon={<IconSearch />}
-              onClick={() =>
-                heroModel
-                  ? gallery.navigateToModel(heroModel)
-                  : gallery.navigateToAnalytics()
-              }
+              onClick={() => gallery.navigateToModel(heroModel)}
             >
-              {heroModel ? t('打开当前重点模型') : t('查看模型分析')}
-            </Button>
-            <Button
-              theme='light'
-              type='primary'
-              icon={<IconActivity />}
-              onClick={() =>
-                heroModel
-                  ? gallery.navigateToLogs({ model_name: heroModel })
-                  : gallery.navigateToLogs()
-              }
-            >
-              {t('查看相关日志')}
+              {t('打开当前重点模型')}
             </Button>
           </div>
-        </div>
-        <div className='portal-model-gallery__hero-side'>
-          <div className='portal-model-gallery__hero-kpi'>
-            <span>{t('当前分析窗口')}</span>
-            <strong>{gallery.activeWindowLabel}</strong>
-            <small>
-              {gallery.dateRange?.[0]} 至 {gallery.dateRange?.[1]}
-            </small>
-          </div>
-          <div className='portal-model-gallery__hero-kpi'>
-            <span>{t('当前重点模型')}</span>
-            <strong>{heroModel || t('暂无数据')}</strong>
-            <small>
-              {heroModel
-                ? t('可直接打开详情或跳转日志中心继续分析')
-                : t('当有模型使用数据后，这里会自动高亮')}
-            </small>
-          </div>
-        </div>
-      </Card>
-
-      <div className='portal-overview__metrics portal-model-gallery__metrics'>
-        {gallery.metricCards.map((item) => (
-          <Card
-            key={item.key}
-            className='portal-panel portal-overview__metric'
-            bordered={false}
-          >
-            <span className='portal-overview__metric-label'>{item.label}</span>
-            <strong className='portal-overview__metric-value'>
-              {item.value}
-            </strong>
-            <small className='portal-overview__metric-hint'>{item.hint}</small>
-          </Card>
-        ))}
+        ) : null}
       </div>
 
-      <div className='portal-model-gallery__insights'>
+      {showMetricCards ? (
+        <div className='portal-overview__metrics portal-model-gallery__metrics'>
+          {metricCards.map((item) => (
+            <Card
+              key={item.key}
+              className='portal-panel portal-overview__metric'
+              bordered={false}
+            >
+              <span className='portal-overview__metric-label'>{item.label}</span>
+              <strong className='portal-overview__metric-value'>
+                {item.value}
+              </strong>
+              <small className='portal-overview__metric-hint'>{item.hint}</small>
+            </Card>
+          ))}
+        </div>
+      ) : null}
+
+      {showInsightSections ? (
+        <div
+          className={`portal-model-gallery__insights${showFavoriteModels && showConsumptionModels ? '' : ' portal-model-gallery__insights--single'}`}
+        >
+          {showFavoriteModels ? (
+            <Card
+              className='portal-panel portal-detail-panel portal-model-gallery__insight-card'
+              bordered={false}
+            >
+              <div className='portal-overview__section-head'>
+                <div>
+                  <div className='portal-overview__eyebrow'>{t('个人视角')}</div>
+                  <h2>{t('我的高频模型')}</h2>
+                </div>
+              </div>
+              {renderModelInsightList(
+                gallery.favoriteModels,
+                t('暂无高频模型'),
+                t('切换时间窗口或开始调用后，这里会显示你最常用的模型。'),
+                t,
+              )}
+            </Card>
+          ) : null}
+
+          {showConsumptionModels ? (
+            <Card
+              className='portal-panel portal-detail-panel portal-model-gallery__insight-card'
+              bordered={false}
+            >
+              <div className='portal-overview__section-head'>
+                <div>
+                  <div className='portal-overview__eyebrow'>{t('消耗视角')}</div>
+                  <h2>{t('近期高消耗模型')}</h2>
+                </div>
+              </div>
+              {renderModelInsightList(
+                gallery.consumptionModels,
+                t('暂无消耗数据'),
+                t('当前窗口内还没有模型消耗记录，稍后回来这里查看。'),
+                t,
+              )}
+            </Card>
+          ) : null}
+        </div>
+      ) : (
         <Card
           className='portal-panel portal-detail-panel portal-model-gallery__insight-card'
           bordered={false}
         >
           <div className='portal-overview__section-head'>
             <div>
-              <div className='portal-overview__eyebrow'>{t('个人视角')}</div>
-              <h2>{t('我的高频模型')}</h2>
+              <div className='portal-overview__eyebrow'>{t('重点模型')}</div>
+              <h2>{t('当前窗口还没有形成模型排行')}</h2>
             </div>
-            <Button
-              theme='borderless'
-              type='tertiary'
-              icon={<IconList />}
-              onClick={gallery.navigateToAnalytics}
-            >
-              {t('查看调用趋势')}
-            </Button>
           </div>
-          {renderModelInsightList(
-            gallery.favoriteModels,
-            t('暂无高频模型'),
-            t('切换时间窗口或开始调用后，这里会显示你最常用的模型。'),
-            t,
-          )}
+          <PortalStateBlock
+            compact
+            contained={false}
+            title={t('暂无高频或高消耗模型')}
+            description={t('等真实调用进入当前时间窗口后，这里再展开模型排行。')}
+            actionLabel={t('查看模型分析')}
+            actionIcon={<IconSearch />}
+            onAction={gallery.navigateToAnalytics}
+          />
         </Card>
-
-        <Card
-          className='portal-panel portal-detail-panel portal-model-gallery__insight-card'
-          bordered={false}
-        >
-          <div className='portal-overview__section-head'>
-            <div>
-              <div className='portal-overview__eyebrow'>{t('消耗视角')}</div>
-              <h2>{t('近期高消耗模型')}</h2>
-            </div>
-            <Button
-              theme='borderless'
-              type='tertiary'
-              icon={<IconPulse />}
-              onClick={gallery.navigateToAnalytics}
-            >
-              {t('查看消耗趋势')}
-            </Button>
-          </div>
-          {renderModelInsightList(
-            gallery.consumptionModels,
-            t('暂无消耗数据'),
-            t('当前窗口内还没有模型消耗记录，稍后回来这里查看。'),
-            t,
-          )}
-        </Card>
-      </div>
+      )}
 
       <div className='portal-model-gallery__directory'>
-        <div className='portal-overview__section-head portal-model-gallery__directory-head'>
+        <div className='portal-model-gallery__directory-head portal-model-gallery__directory-head--compact'>
           <div>
             <div className='portal-overview__eyebrow'>{t('统一目录')}</div>
             <h2>{t('搜索、筛选、排序与详情视图')}</h2>
-            <p className='portal-model-gallery__directory-description'>
-              {t(
-                '下方直接复用现有模型目录能力，并迁入客户门户。你可以继续搜索模型、筛选供应商与端点、切换卡片或表格视图，并在统一详情面板里查看定价和可用端点。',
-              )}
-            </p>
           </div>
-          <Button
-            theme='light'
-            type='primary'
-            icon={<IconArrowRight />}
-            onClick={() =>
-              heroModel
-                ? gallery.navigateToLogs({ model_name: heroModel })
-                : gallery.navigateToLogs()
-            }
-          >
-            {t('查看当前重点模型日志')}
-          </Button>
         </div>
 
-        <PricingPage portalMode />
+        <PricingPage portalMode compactHeader />
       </div>
     </div>
   );

@@ -25,7 +25,7 @@ import ModelDetailSideSheet from '../modal/ModelDetailSideSheet';
 import { useModelPricingData } from '../../../../hooks/model-pricing/useModelPricingData';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 
-const PricingPage = ({ portalMode = false }) => {
+const PricingPage = ({ portalMode = false, compactHeader = false }) => {
   const pricingData = useModelPricingData();
   const { Sider, Content } = Layout;
   const isMobile = useIsMobile();
@@ -54,6 +54,7 @@ const PricingPage = ({ portalMode = false }) => {
           <PricingContent
             {...allProps}
             isMobile={isMobile}
+            compactHeader={compactHeader}
             sidebarProps={allProps}
           />
         </Content>

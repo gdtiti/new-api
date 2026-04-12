@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { Button, Card, Progress, Tag } from '@douyinfe/semi-ui';
 import { IconArrowRight, IconRefresh } from '@douyinfe/semi-icons';
-import { useNavigate } from 'react-router-dom';
 import { renderQuota } from '../../helpers';
 import SubscriptionPlansCard from '../topup/SubscriptionPlansCard';
 import usePortalBillingData from '../../hooks/portal/usePortalBillingData';
@@ -27,7 +26,6 @@ import PortalBillingOverlays from './PortalBillingOverlays';
 import PortalStateBlock from './PortalStateBlock';
 
 const PortalSubscriptionPage = () => {
-  const navigate = useNavigate();
   const billing = usePortalBillingData();
 
   if (billing.initializing && !billing.userState?.user) {
@@ -45,114 +43,73 @@ const PortalSubscriptionPage = () => {
       key: 'active',
       label: billing.t('生效订阅'),
       value: `${billing.activeSubscriptionCount}`,
-      hint: billing.t('当前仍可直接使用的套餐数量'),
-    },
-    {
-      key: 'expired',
-      label: billing.t('历史订阅'),
-      value: `${billing.expiredSubscriptionCount}`,
-      hint: billing.t('已结束或已失效的订阅记录'),
     },
     {
       key: 'remain',
       label: billing.t('主套餐剩余'),
-      value: renderQuota(billing.primarySubscriptionRemain),
-      hint: billing.t('按当前主套餐的剩余额度计算'),
+      value: billing.hasActiveSubscription
+        ? renderQuota(billing.primarySubscriptionRemain)
+        : billing.t('待开通'),
     },
     {
       key: 'preference',
-      label: billing.t('扣费偏好'),
+      label: billing.t('优先扣费'),
       value: billing.billingPreferenceLabel,
-      hint: billing.t('购买后会按此偏好参与扣费'),
+      valueClassName: 'portal-overview__metric-value--compact',
     },
   ];
+  const showRecentBillingCard = billing.recentBillingItems.length > 0;
+  const showPaymentMethodsCard = billing.paymentMethodSummary.length > 0;
+  const showSubscriptionSide = showRecentBillingCard;
+  const showUsageProgress = billing.hasActiveSubscription;
 
   return (
     <div className='portal-overview portal-billing'>
-      <Card
-        className='portal-panel portal-overview__hero portal-billing__hero'
-        bordered={false}
-      >
-        <div className='portal-overview__hero-content'>
-          <div>
-            <div className='portal-overview__eyebrow'>
-              {billing.t('订阅中心')}
-            </div>
-            <h1 className='portal-overview__hero-title'>
-              {billing.t('统一查看套餐状态、周期与续费入口')}
-            </h1>
-            <p className='portal-overview__hero-description'>
-              {billing.t(
-                '这里展示当前订阅状态、扣费偏好、剩余额度和最近账单，并直接承接升级与续费流程。',
-              )}
-            </p>
-          </div>
-          <div className='portal-overview__hero-actions'>
-            <Button
-              theme='solid'
-              type='primary'
-              icon={<IconRefresh />}
-              loading={billing.refreshing}
-              onClick={billing.refreshAll}
-            >
-              {billing.t('刷新数据')}
-            </Button>
-            <Button
-              theme='light'
-              type='tertiary'
-              icon={<IconArrowRight />}
-              onClick={() => navigate('/app/wallet')}
-            >
-              {billing.t('查看钱包中心')}
-            </Button>
-            <Button
-              theme='borderless'
-              type='tertiary'
-              icon={<IconArrowRight />}
-              onClick={() => navigate('/app/logs')}
-            >
-              {billing.t('查看扣费日志')}
-            </Button>
-          </div>
+      <div className='portal-page-head'>
+        <div className='portal-page-head__main'>
+          <div className='portal-page-head__eyebrow'>{billing.t('订阅中心')}</div>
+          <h1 className='portal-page-head__title'>
+            {billing.t('先看当前套餐，再决定升级或续费')}
+          </h1>
         </div>
-        <div className='portal-overview__hero-side'>
-          <div className='portal-overview__hero-kpi'>
-            <span>{billing.t('当前主套餐')}</span>
-            <strong>{billing.primarySubscriptionTitle}</strong>
-            <small>
-              {billing.primarySubscriptionRemainDays === null
-                ? billing.t('未设置到期时间')
-                : billing.t('预计剩余 {{days}} 天', {
-                    days: billing.primarySubscriptionRemainDays,
-                  })}
-            </small>
-          </div>
-          <div className='portal-overview__hero-kpi'>
-            <span>{billing.t('扣费偏好')}</span>
-            <strong>{billing.billingPreferenceLabel}</strong>
-            <small>{billing.billingSourceSummary}</small>
-          </div>
+        <div className='portal-page-head__actions'>
+          <Button
+            theme='solid'
+            type='primary'
+            icon={<IconRefresh />}
+            loading={billing.refreshing}
+            onClick={billing.refreshAll}
+          >
+            {billing.t('刷新数据')}
+          </Button>
         </div>
-      </Card>
+      </div>
 
-      <div className='portal-overview__metrics'>
+      <div className='portal-overview__metrics portal-overview__metrics--billing'>
         {subscriptionMetricCards.map((item) => (
           <Card
             key={item.key}
-            className='portal-panel portal-overview__metric'
+            className='portal-panel portal-overview__metric portal-overview__metric--compact'
             bordered={false}
           >
             <span className='portal-overview__metric-label'>{item.label}</span>
-            <strong className='portal-overview__metric-value'>
+            <strong
+              className={`portal-overview__metric-value${item.valueClassName ? ` ${item.valueClassName}` : ''}`}
+            >
               {item.value}
             </strong>
-            <small className='portal-overview__metric-hint'>{item.hint}</small>
+            {item.hint ? (
+              <small className='portal-overview__metric-hint'>{item.hint}</small>
+            ) : null}
           </Card>
         ))}
       </div>
 
-      <div className='portal-billing__summary-grid'>
-        <Card className='portal-panel portal-billing__summary' bordered={false}>
+      <div className='portal-billing__summary-grid portal-billing__summary-grid--single'>
+        <Card
+          className='portal-panel portal-billing__summary portal-billing__summary--subscription'
+          bordered={false}
+        >
           <div className='portal-overview__section-head'>
             <div>
               <div className='portal-overview__eyebrow'>
@@ -172,157 +129,57 @@ const PortalSubscriptionPage = () => {
           <div className='portal-billing__summary-metrics'>
             <div className='portal-billing__summary-item'>
               <span>{billing.t('已用额度')}</span>
-              <strong>{renderQuota(billing.primarySubscriptionUsed)}</strong>
+              <strong>
+                {billing.hasActiveSubscription
+                  ? renderQuota(billing.primarySubscriptionUsed)
+                  : billing.t('待开通')}
+              </strong>
             </div>
             <div className='portal-billing__summary-item'>
               <span>{billing.t('剩余额度')}</span>
-              <strong>{renderQuota(billing.primarySubscriptionRemain)}</strong>
+              <strong>
+                {billing.hasActiveSubscription
+                  ? renderQuota(billing.primarySubscriptionRemain)
+                  : billing.t('待开通')}
+              </strong>
             </div>
             <div className='portal-billing__summary-item'>
               <span>{billing.t('剩余天数')}</span>
               <strong>
-                {billing.primarySubscriptionRemainDays === null
-                  ? billing.t('未设置')
+                {!billing.hasActiveSubscription
+                  ? billing.t('待开通')
+                  : billing.primarySubscriptionRemainDays === null
+                    ? billing.t('未设置')
                   : billing.t('{{days}} 天', {
                       days: billing.primarySubscriptionRemainDays,
                     })}
               </strong>
             </div>
           </div>
-          <Progress
-            percent={billing.primarySubscriptionUsagePercent}
-            stroke='#7c3aed'
-            showInfo
-            format={(percent) => `${percent}%`}
-          />
-        </Card>
-
-        <Card
-          className='portal-panel portal-detail-panel portal-billing__methods'
-          bordered={false}
-        >
-          <div className='portal-overview__section-head'>
-            <div>
-              <div className='portal-overview__eyebrow'>
-                {billing.t('账单来源说明')}
-              </div>
-              <h2>{billing.billingPreferenceLabel}</h2>
-            </div>
-          </div>
-          <p className='portal-billing__description'>
-            {billing.billingSourceSummary}
-          </p>
-          <div className='portal-billing__summary-metrics'>
-            <div className='portal-billing__summary-item'>
-              <span>{billing.t('钱包余额')}</span>
-              <strong>
-                {renderQuota(billing.userState?.user?.quota || 0)}
-              </strong>
-            </div>
-            <div className='portal-billing__summary-item'>
-              <span>{billing.t('生效订阅')}</span>
-              <strong>{billing.activeSubscriptionCount}</strong>
-            </div>
-            <div className='portal-billing__summary-item'>
-              <span>{billing.t('可购套餐')}</span>
-              <strong>
-                {billing.subscriptionCardProps?.plans?.length || 0}
-              </strong>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className='portal-billing__content-grid portal-billing__content-grid--subscription'>
-        <div className='portal-billing__main'>
-          <Card className='portal-panel portal-billing__plans' bordered={false}>
-            <div className='portal-overview__section-head'>
-              <div>
-                <div className='portal-overview__eyebrow'>
-                  {billing.t('升级与续费')}
-                </div>
-                <h2>{billing.t('可购买套餐与当前订阅偏好')}</h2>
-              </div>
-            </div>
-            <SubscriptionPlansCard
-              {...billing.subscriptionCardProps}
-              withCard={false}
-            />
-          </Card>
-        </div>
-
-        <div className='portal-billing__side'>
-          <Card
-            className='portal-panel portal-detail-panel portal-billing__side-card'
-            bordered={false}
-          >
-            <div className='portal-overview__section-head'>
-              <div>
-                <div className='portal-overview__eyebrow'>
-                  {billing.t('最近账单')}
-                </div>
-                <h2>{billing.t('套餐购买与支付摘要')}</h2>
-              </div>
-              <Button
-                theme='borderless'
-                type='tertiary'
-                icon={<IconArrowRight />}
-                onClick={billing.handleOpenHistory}
-              >
-                {billing.t('查看完整账单')}
-              </Button>
-            </div>
-            {billing.recentBillingItems.length ? (
-              <div className='portal-billing__record-list'>
-                {billing.recentBillingItems.map((item) => (
-                  <div className='portal-billing__record' key={item.key}>
-                    <div>
-                      <strong>{item.sourceLabel}</strong>
-                      <p>
-                        {item.paymentMethodLabel} · {item.createdAt}
-                      </p>
-                    </div>
-                    <div className='portal-billing__record-meta'>
-                      <span>{item.moneyLabel}</span>
-                      <Tag
-                        color={
-                          item.sourceTone === 'subscription'
-                            ? 'violet'
-                            : 'green'
-                        }
-                        shape='circle'
-                      >
-                        {item.amountLabel}
-                      </Tag>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <PortalStateBlock
-                compact
-                contained={false}
-                title={billing.t('暂无套餐账单')}
-                description={billing.t(
-                  '完成套餐购买或续费后，这里会展示最近账单摘要。',
-                )}
+          {showUsageProgress ? (
+            <div className='portal-billing__summary-progress'>
+              <Progress
+                percent={billing.primarySubscriptionUsagePercent}
+                stroke='#7c3aed'
+                showInfo
+                format={(percent) => `${percent}%`}
               />
-            )}
-          </Card>
-
-          <Card
-            className='portal-panel portal-detail-panel portal-billing__side-card'
-            bordered={false}
-          >
-            <div className='portal-overview__section-head'>
-              <div>
-                <div className='portal-overview__eyebrow'>
-                  {billing.t('支付方式')}
-                </div>
-                <h2>{billing.t('套餐支付渠道')}</h2>
-              </div>
             </div>
-            {billing.paymentMethodSummary.length ? (
+          ) : (
+            <div className='portal-billing__summary-note'>
+              <strong>{billing.t('当前还没有生效套餐')}</strong>
+              <span>
+                {billing.t(
+                  '选择下方套餐后，这里会显示额度占用、到期时间和续费状态。',
+                )}
+              </span>
+            </div>
+          )}
+          {showPaymentMethodsCard ? (
+            <div className='portal-billing__inline-section'>
+              <div className='portal-overview__eyebrow'>
+                {billing.t('支付方式')}
+              </div>
               <div className='portal-billing__method-list'>
                 {billing.paymentMethodSummary.map((method) => (
                   <div className='portal-billing__method' key={method.type}>
@@ -337,18 +194,84 @@ const PortalSubscriptionPage = () => {
                   </div>
                 ))}
               </div>
-            ) : (
-              <PortalStateBlock
-                compact
-                contained={false}
-                title={billing.t('暂无可用支付方式')}
-                description={billing.t(
-                  '当前尚未开启在线套餐支付，请联系管理员确认配置。',
-                )}
-              />
-            )}
+            </div>
+          ) : null}
+        </Card>
+      </div>
+
+      <div
+        className={`portal-billing__content-grid portal-billing__content-grid--subscription${showSubscriptionSide ? '' : ' portal-billing__content-grid--single'}`}
+      >
+        <div className='portal-billing__main'>
+          <Card className='portal-panel portal-billing__plans' bordered={false}>
+              <div className='portal-overview__section-head'>
+                <div>
+                  <div className='portal-overview__eyebrow'>
+                    {billing.t('升级与续费')}
+                  </div>
+                  <h2>{billing.t('可购买套餐')}</h2>
+                </div>
+              </div>
+            <SubscriptionPlansCard
+              {...billing.subscriptionCardProps}
+              withCard={false}
+            />
           </Card>
         </div>
+
+        {showSubscriptionSide ? (
+          <div className='portal-billing__side'>
+            {showRecentBillingCard ? (
+              <Card
+                className='portal-panel portal-detail-panel portal-billing__side-card'
+                bordered={false}
+              >
+                <div className='portal-overview__section-head'>
+                  <div>
+                    <div className='portal-overview__eyebrow'>
+                      {billing.t('最近账单')}
+                    </div>
+                    <h2>{billing.t('套餐购买与支付摘要')}</h2>
+                  </div>
+                  <Button
+                    theme='borderless'
+                    type='tertiary'
+                    icon={<IconArrowRight />}
+                    onClick={billing.handleOpenHistory}
+                  >
+                    {billing.t('查看完整账单')}
+                  </Button>
+                </div>
+                <div className='portal-billing__record-list'>
+                  {billing.recentBillingItems.map((item) => (
+                    <div className='portal-billing__record' key={item.key}>
+                      <div>
+                        <strong>{item.sourceLabel}</strong>
+                        <p>
+                          {item.paymentMethodLabel} · {item.createdAt}
+                        </p>
+                      </div>
+                      <div className='portal-billing__record-meta'>
+                        <span>{item.moneyLabel}</span>
+                        <Tag
+                          color={
+                            item.sourceTone === 'subscription'
+                              ? 'violet'
+                              : 'green'
+                          }
+                          shape='circle'
+                        >
+                          {item.amountLabel}
+                        </Tag>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ) : null}
+
+          </div>
+        ) : null}
       </div>
 
       <PortalBillingOverlays billing={billing} />

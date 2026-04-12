@@ -26,16 +26,18 @@ const { Text } = Typography;
 
 const TaskLogsActions = ({ compactMode, setCompactMode, t }) => {
   return (
-    <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
-      <div className='flex items-center text-orange-500 mb-2 md:mb-0'>
+    <div className='portal-logs__stats flex flex-col md:flex-row justify-between items-start md:items-center gap-3 w-full'>
+      <div className='portal-logs__banner flex items-center mb-2 md:mb-0'>
         <IconEyeOpened className='mr-2' />
         <Text>{t('任务记录')}</Text>
       </div>
-      <CompactModeToggle
-        compactMode={compactMode}
-        setCompactMode={setCompactMode}
-        t={t}
-      />
+      <div className='portal-logs__toggle'>
+        <CompactModeToggle
+          compactMode={compactMode}
+          setCompactMode={setCompactMode}
+          t={t}
+        />
+      </div>
     </div>
   );
 };

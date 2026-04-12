@@ -31,6 +31,7 @@ const PricingTopSection = memo(
     handleCompositionEnd,
     isMobile,
     sidebarProps,
+    compactHeader,
     filterVendor,
     models,
     filteredModels,
@@ -52,7 +53,7 @@ const PricingTopSection = memo(
 
     return (
       <>
-        {isMobile ? (
+        {isMobile || compactHeader ? (
           <>
             <div className='w-full'>
               <SearchActions
