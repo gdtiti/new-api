@@ -978,13 +978,7 @@ html.dark .with-pastel-balls::before {
   min-height: 100dvh;
   display: flex;
   overflow: hidden;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(var(--semi-blue-0), 0.06),
-      rgba(var(--semi-cyan-0), 0.02)
-    ),
-    var(--semi-color-bg-0);
+  background: var(--semi-color-bg-0);
   color: var(--semi-color-text-0);
 }
 
@@ -1017,17 +1011,17 @@ html.dark .with-pastel-balls::before {
 .portal-shell__sidebar {
   position: relative;
   z-index: 1;
-  width: 288px;
-  flex: 0 0 288px;
+  width: 272px;
+  flex: 0 0 272px;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 20px 16px;
+  gap: 18px;
+  padding: 18px 14px;
   border-right: 1px solid rgba(var(--semi-grey-2), 0.14);
-  background: rgba(var(--semi-white), 0.72);
-  backdrop-filter: blur(22px);
+  background: rgba(var(--semi-white), 0.84);
+  backdrop-filter: blur(14px);
 }
 
 html.dark .portal-shell__sidebar {
@@ -1035,8 +1029,8 @@ html.dark .portal-shell__sidebar {
 }
 
 .portal-shell__sidebar--collapsed {
-  width: 96px;
-  flex-basis: 96px;
+  width: 88px;
+  flex-basis: 88px;
 }
 
 .portal-shell__brand {
@@ -1098,11 +1092,11 @@ html.dark .portal-shell__sidebar {
 .portal-shell__nav-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .portal-shell__nav-section + .portal-shell__nav-section {
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .portal-shell__nav-items {
@@ -1116,8 +1110,8 @@ html.dark .portal-shell__sidebar {
   align-items: flex-start;
   gap: 12px;
   width: 100%;
-  padding: 12px;
-  border-radius: 16px;
+  padding: 12px 14px;
+  border-radius: 18px;
   text-align: left;
   cursor: pointer;
   transition:
@@ -1148,7 +1142,7 @@ html.dark .portal-shell__sidebar {
 .portal-shell__nav-copy {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .portal-shell__nav-title {
@@ -1174,14 +1168,14 @@ html.dark .portal-shell__sidebar {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 24px;
+  gap: 18px;
+  padding: 20px 22px;
 }
 
 .portal-shell__header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -1198,6 +1192,7 @@ html.dark .portal-shell__sidebar {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-width: 640px;
 }
 
 .portal-shell__icon-button {
@@ -1256,6 +1251,7 @@ html.dark .portal-shell__hero {
   min-height: 0;
   overflow: auto;
   border-radius: 24px;
+  padding-bottom: 6px;
 }
 
 /* ==================== 统一认证中心 ==================== */
@@ -1767,8 +1763,8 @@ html.dark .auth-hub__side-card {
 
 .portal-overview__hero .semi-card-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 20px;
   align-items: stretch;
 }
 
@@ -1797,13 +1793,13 @@ html.dark .auth-hub__side-card {
 .portal-overview__hero-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 .portal-overview__hero-side {
-  min-width: 280px;
+  min-width: 0;
   display: grid;
   gap: 14px;
 }
@@ -1838,11 +1834,11 @@ html.dark .auth-hub__side-card {
 .portal-overview__metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
 }
 
 .portal-overview__metrics--analytics {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .portal-overview__metric {
@@ -1864,7 +1860,7 @@ html.dark .auth-hub__side-card {
 }
 
 .portal-overview__content-grid {
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
 }
 
 .portal-overview__charts,
@@ -1874,7 +1870,7 @@ html.dark .auth-hub__side-card {
 }
 
 .portal-overview__quick-actions {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .portal-overview__subscription,
@@ -1891,12 +1887,12 @@ html.dark .auth-hub__side-card {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .portal-overview__section-head h2 {
-  margin: 10px 0 0;
-  font-size: 22px;
+  margin: 8px 0 0;
+  font-size: 20px;
 }
 
 .portal-overview__subscription-meta {
@@ -1920,7 +1916,7 @@ html.dark .auth-hub__side-card {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   text-align: left;
   border-radius: var(--portal-radius-item);
   transition:
@@ -1991,6 +1987,7 @@ html.dark .auth-hub__side-card {
 .portal-quick-action {
   display: grid;
   gap: 12px;
+  align-content: start;
 }
 
 .portal-quick-action__icon {
@@ -2032,8 +2029,8 @@ html.dark .auth-hub__side-card {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: 20px;
   align-items: start;
 }
 
@@ -2044,7 +2041,7 @@ html.dark .auth-hub__side-card {
 }
 
 .portal-analytics__hero-content {
-  gap: 20px;
+  gap: 16px;
 }
 
 .portal-analytics__hero-actions {
@@ -2055,12 +2052,12 @@ html.dark .auth-hub__side-card {
 }
 
 .portal-analytics__hero-side {
-  gap: 16px;
+  gap: 12px;
 }
 
 .portal-analytics__hero-kpi {
   gap: 6px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   border-radius: var(--portal-radius-item);
   background: var(--portal-surface-muted);
   border: 1px solid var(--portal-border);
@@ -2087,8 +2084,8 @@ html.dark .auth-hub__side-card {
 
 .portal-analytics__metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .portal-analytics__metric,
@@ -2129,7 +2126,7 @@ html.dark .auth-hub__side-card {
 }
 
 .portal-analytics__actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -2138,12 +2135,12 @@ html.dark .auth-hub__side-card {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .portal-analytics__section-head h2 {
-  margin: 10px 0 0;
-  font-size: 22px;
+  margin: 8px 0 0;
+  font-size: 20px;
 }
 
 .portal-analytics__section-description {
@@ -2160,7 +2157,7 @@ html.dark .auth-hub__side-card {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   text-align: left;
   border-radius: var(--portal-radius-item);
   background: var(--portal-surface-elevated);
@@ -2244,7 +2241,7 @@ html.dark .auth-hub__side-card {
 @media (max-width: 1440px) {
   .portal-overview__metrics--analytics,
   .portal-overview__quick-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .portal-analytics__metrics {
@@ -2606,20 +2603,20 @@ html.dark .auth-hub__side-card {
 .portal-model-gallery__hero-content {
   display: flex;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
   align-items: flex-start;
 }
 
 .portal-model-gallery__hero-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .portal-model-gallery__hero-side {
-  margin-top: 20px;
+  margin-top: 16px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
@@ -2627,8 +2624,8 @@ html.dark .auth-hub__side-card {
 
 .portal-model-gallery__hero-kpi {
   border-radius: var(--portal-radius-item);
-  padding: 18px 20px;
-  background: rgba(255, 255, 255, 0.66);
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--portal-border-strong);
   display: flex;
   flex-direction: column;
@@ -2657,7 +2654,7 @@ html.dark .portal-model-gallery__hero-kpi {
 .portal-model-gallery__insights {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
 .portal-model-gallery__insight-card {
@@ -2674,10 +2671,10 @@ html.dark .portal-model-gallery__hero-kpi {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   border-radius: var(--portal-radius-item);
   border: 1px solid var(--portal-border);
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.68);
 }
 
 html.dark .portal-model-gallery__insight-item {
@@ -2728,7 +2725,7 @@ html.dark .portal-model-gallery__insight-item {
 .portal-model-gallery__directory {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .portal-model-gallery__directory-head {
@@ -2739,7 +2736,7 @@ html.dark .portal-model-gallery__insight-item {
 .portal-model-gallery__directory-description {
   margin: 8px 0 0;
   color: var(--semi-color-text-2);
-  max-width: 860px;
+  max-width: 760px;
   line-height: 1.7;
 }
 
@@ -2754,8 +2751,8 @@ html.dark .portal-model-gallery__insight-item {
   border-radius: 24px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
 }
 
 html.dark .pricing-page--portal .pricing-layout {

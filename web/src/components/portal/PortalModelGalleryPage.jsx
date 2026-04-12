@@ -22,7 +22,6 @@ import { useOutletContext } from 'react-router-dom';
 import {
   IconActivity,
   IconArrowRight,
-  IconHistogram,
   IconList,
   IconPulse,
   IconSearch,
@@ -62,16 +61,16 @@ const renderModelInsightList = (items, emptyTitle, emptyDescription, t) => {
             <span>{item.value}</span>
             <div className='portal-model-gallery__insight-actions'>
               <Button
-                theme='borderless'
-                type='tertiary'
+                theme='light'
+                type='primary'
                 icon={<IconSearch />}
                 onClick={item.onOpenModel}
               >
                 {t('模型详情')}
               </Button>
               <Button
-                theme='light'
-                type='primary'
+                theme='borderless'
+                type='tertiary'
                 icon={<IconArrowRight />}
                 onClick={item.onOpenLogs}
               >
@@ -145,7 +144,7 @@ const PortalModelGalleryPage = () => {
             </h1>
             <p className='portal-overview__hero-description'>
               {t(
-                '这里把现有模型目录、统一详情视图，以及你在当前时间窗口里的高频模型和高消耗模型放到了一起，方便直接做筛选、对比和日志追踪。',
+                '这里把模型目录、高频模型和高消耗模型按同一套节奏整理在一起，先看重点，再继续筛选、对比和追踪日志。',
               )}
             </p>
           </div>
@@ -173,14 +172,6 @@ const PortalModelGalleryPage = () => {
               }
             >
               {t('查看相关日志')}
-            </Button>
-            <Button
-              theme='borderless'
-              type='tertiary'
-              icon={<IconHistogram />}
-              onClick={gallery.navigateToAnalytics}
-            >
-              {t('前往分析页')}
             </Button>
           </div>
         </div>

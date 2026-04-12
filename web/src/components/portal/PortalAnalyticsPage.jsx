@@ -24,7 +24,6 @@ import {
   IconCreditCard,
   IconHistogram,
   IconKey,
-  IconList,
   IconPieChartStroked,
   IconPulse,
   IconSafe,
@@ -213,29 +212,6 @@ const PortalAnalyticsPage = () => {
         overview.navigateToLogs(topRequestModel ? { model_name: topRequestModel } : {}),
       disabled: false,
     },
-    {
-      key: 'request-rank',
-      eyebrow: t('调用排行'),
-      title: t('调用次数分布'),
-      description: t('快速定位当前时间窗口里最活跃的模型。'),
-      icon: <IconList />,
-      spec: overview.specRankBar,
-      actionLabel: t('继续排查'),
-      onAction: () =>
-        overview.navigateToLogs(topRequestModel ? { model_name: topRequestModel } : {}),
-      disabled: false,
-    },
-    {
-      key: 'usage-share',
-      eyebrow: t('占比'),
-      title: t('调用占比结构'),
-      description: t('用占比视角判断是否出现模型集中或结构失衡。'),
-      icon: <IconPieChartStroked />,
-      spec: overview.specPie,
-      actionLabel: t('查看模型'),
-      onAction: () => overview.navigateToModel(topQuotaModel),
-      disabled: !topQuotaModel,
-    },
   ];
 
   return (
@@ -265,7 +241,7 @@ const PortalAnalyticsPage = () => {
             </h1>
             <p className='portal-overview__hero-description'>
               {t(
-                '这里延续门户统一筛选条件，把模型分布、调用趋势、重点排行和后续动作重新整理成更清晰的分析版面，方便直接继续排查和跳转。',
+                '这里保留最关键的两张主图，再配合排行、洞察和操作入口，方便先看走势，再继续排查具体模型。',
               )}
             </p>
           </div>
@@ -435,11 +411,11 @@ const PortalAnalyticsPage = () => {
               <div className='portal-overview__eyebrow'>{t('下一步')}</div>
               <h2>{t('常用入口')}</h2>
               <p className='portal-analytics__section-description'>
-                {t('保留门户常用操作，方便在分析后直接继续处理账户和日志。')}
+                {t('只保留分析后最常继续的入口，避免页面里同时出现过多动作卡。')}
               </p>
             </div>
           </div>
-          {renderQuickActions(overview.quickActions)}
+          {renderQuickActions(overview.quickActions.slice(0, 2))}
         </Card>
       </div>
     </div>

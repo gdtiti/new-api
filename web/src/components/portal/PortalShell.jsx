@@ -27,7 +27,6 @@ import React, {
 import { Avatar, Button, Tag, Typography } from '@douyinfe/semi-ui';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ArrowUpRight,
   BarChart3,
   Boxes,
   CreditCard,
@@ -271,20 +270,12 @@ const PortalShell = () => {
         icon: <KeyRound size={16} />,
       },
       {
-        key: 'models',
-        label: t('模型广场'),
-        onClick: () => goTo('/app/models'),
+        key: 'analytics',
+        label: t('数据分析'),
+        onClick: () => goTo('/app/analytics'),
         type: 'primary',
         theme: 'light',
-        icon: <Boxes size={16} />,
-      },
-      {
-        key: 'account',
-        label: t('账户与安全'),
-        onClick: () => goTo('/app/account'),
-        type: 'tertiary',
-        theme: 'borderless',
-        icon: <UserRound size={16} />,
+        icon: <BarChart3 size={16} />,
       },
     ],
     [goTo, t],
@@ -304,9 +295,6 @@ const PortalShell = () => {
       data-portal-mode={activeSkin.mode}
       data-portal-skin={activeSkin.key}
     >
-      <div className='blur-ball blur-ball-indigo portal-shell__blur portal-shell__blur--primary' />
-      <div className='blur-ball blur-ball-teal portal-shell__blur portal-shell__blur--secondary' />
-
       {isMobile && mobileNavOpen && (
         <button
           aria-label={t('关闭导航')}
@@ -352,33 +340,6 @@ const PortalShell = () => {
         </button>
 
         <div className='portal-shell__nav'>
-          {!sidebarCollapsed && (
-            <div className='portal-shell__nav-featured'>
-              <div className='portal-shell__nav-featured-header'>
-                <div className='portal-shell__nav-featured-copy'>
-                  <span className='portal-shell__nav-featured-badge'>
-                    {t('主模块')}
-                  </span>
-                  <strong>{t('令牌中心已前置到门户一级导航')}</strong>
-                </div>
-                <KeyRound size={18} />
-              </div>
-              <p>
-                {t(
-                  '生成、查看、复制和批量管理令牌，现在都可以直接从这里进入，不再隐藏在旧控制台页面里。',
-                )}
-              </p>
-              <Button
-                icon={<ArrowUpRight size={16} />}
-                onClick={() => goTo('/app/tokens')}
-                theme='solid'
-                type='primary'
-              >
-                {t('打开令牌中心')}
-              </Button>
-            </div>
-          )}
-
           {navSections.map((section) => (
             <div className='portal-shell__nav-section' key={section.label}>
               {!sidebarCollapsed && (
@@ -500,15 +461,6 @@ const PortalShell = () => {
               </Button>
             )}
 
-            <Button
-              icon={<ArrowUpRight size={16} />}
-              onClick={() => goTo('/pricing')}
-              theme='outline'
-              type='tertiary'
-            >
-              {t('模型价格')}
-            </Button>
-
             <div className='portal-shell__user-chip'>
               <Avatar size='small' color='light-blue'>
                 {(user?.username || user?.display_name || 'U')
@@ -541,13 +493,13 @@ const PortalShell = () => {
             <div className='portal-shell__hero-copy'>
               <Text className='portal-shell__eyebrow'>{t('统一客户门户')}</Text>
               <Title heading={4} className='!mb-1'>
-                {t('在 {{module}} 中保持一致的客户体验', {
+                {t('让 {{module}} 和账户、数据、动作保持同一套节奏', {
                   module: currentItem?.title || t('总览'),
                 })}
               </Title>
               <Text type='secondary'>
                 {t(
-                  '围绕令牌、余额、订阅、日志与模型分析重组信息架构，把原来分散的入口收回到同一套门户视觉和操作路径里。',
+                  '导航、统计卡、图表和操作入口已经按同一套门户语言重新组织，减少跳转负担，也让每个页面的节奏更统一。',
                 )}
               </Text>
             </div>
@@ -578,41 +530,34 @@ const PortalShell = () => {
           </div>
 
           <div className='portal-shell__hero-rail'>
-            <div className='portal-shell__hero-spotlight'>
-              <div className='portal-shell__hero-spotlight-header'>
-                <span className='portal-shell__hero-spotlight-badge'>
-                  {t('本轮重点')}
-                </span>
-                <KeyRound size={18} />
-              </div>
-              <strong>{t('令牌管理已经提升为门户主入口')}</strong>
+            <div className='portal-shell__hero-focus'>
+              <span className='portal-shell__hero-focus-label'>
+                {t('当前重点')}
+              </span>
+              <strong>{currentItem?.title || t('总览')}</strong>
               <p>
-                {t(
-                  '新的导航、头部动作和总览快捷入口都会直接引导到令牌中心，模型广场和日志中心也围绕令牌路径继续联动。',
-                )}
+                {currentItem?.description ||
+                  t('统一查看客户侧经营与账户信息')}
               </p>
-              <Button
-                icon={<ArrowUpRight size={16} />}
-                onClick={() => goTo('/app/tokens')}
-                theme='light'
-                type='primary'
-              >
-                {t('查看令牌工作区')}
-              </Button>
             </div>
 
-            <div className='portal-shell__tags'>
-              {statusTags.length > 0 ? (
-                statusTags.map((tag) => (
-                  <Tag color={tag.color} key={tag.text} shape='circle'>
-                    {tag.text}
+            <div className='portal-shell__hero-focus portal-shell__hero-focus--tags'>
+              <span className='portal-shell__hero-focus-label'>
+                {t('账户状态')}
+              </span>
+              <div className='portal-shell__tags'>
+                {statusTags.length > 0 ? (
+                  statusTags.map((tag) => (
+                    <Tag color={tag.color} key={tag.text} shape='circle'>
+                      {tag.text}
+                    </Tag>
+                  ))
+                ) : (
+                  <Tag color='grey' shape='circle'>
+                    {t('基础认证已可用')}
                   </Tag>
-                ))
-              ) : (
-                <Tag color='grey' shape='circle'>
-                  {t('基础认证已可用')}
-                </Tag>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </section>
