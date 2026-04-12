@@ -185,7 +185,7 @@ func relayWithPreparedInfo(c *gin.Context, relayFormat types.RelayFormat, reques
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
-		return
+		return newAPIError
 	}
 
 	if priceData.FreeModel {
