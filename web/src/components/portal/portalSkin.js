@@ -115,25 +115,135 @@ export const getPortalChartTheme = (skinKey) => {
   return {
     skinKey: skin.key,
     palette: buildPortalChartPalette(skin),
-    titleColor: isDark ? '#f4f8ff' : '#142033',
-    subtextColor: isDark ? '#b7c8dc' : '#5c6e86',
-    axisTextColor: isDark ? '#cad8ea' : '#54657d',
-    legendTextColor: isDark ? '#e6eef9' : '#1b2a40',
-    labelColor: isDark ? '#f4f8ff' : '#142033',
+    titleColor: isDark ? '#f4f8ff' : '#0f172a',
+    subtextColor: isDark ? '#c6d4e5' : '#334155',
+    axisTextColor: isDark ? '#d5e2f0' : '#475569',
+    legendTextColor: isDark ? '#eff5ff' : '#0f172a',
+    labelColor: isDark ? '#f4f8ff' : '#0f172a',
     gridColor: isDark
       ? 'rgba(148, 163, 184, 0.16)'
-      : 'rgba(100, 116, 139, 0.14)',
+      : 'rgba(100, 116, 139, 0.12)',
     axisLineColor: isDark
       ? 'rgba(148, 163, 184, 0.2)'
-      : 'rgba(100, 116, 139, 0.18)',
+      : 'rgba(100, 116, 139, 0.16)',
     tooltipBackground: isDark
       ? 'rgba(9, 18, 32, 0.94)'
       : 'rgba(255, 255, 255, 0.96)',
     tooltipBorderColor: isDark
       ? 'rgba(148, 163, 184, 0.22)'
-      : 'rgba(37, 99, 235, 0.12)',
-    tooltipTextColor: isDark ? '#f8fbff' : '#142033',
-    hoverStroke: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(15, 23, 42, 0.18)',
+      : 'rgba(37, 99, 235, 0.1)',
+    tooltipTextColor: isDark ? '#f8fbff' : '#0f172a',
+    hoverStroke: isDark ? 'rgba(255, 255, 255, 0.42)' : 'rgba(15, 23, 42, 0.14)',
     areaOpacity: isDark ? 0.22 : 0.18,
   };
+};
+
+const buildPortalChartAxes = (spec, variant) => {
+  if (Array.isArray(spec?.axes) && spec.axes.length > 0) {
+    return spec.axes;
+  }
+
+  if (variant === 'pie') {
+    return spec?.axes;
+  }
+
+  return [
+    {
+      orient: 'bottom',
+      type: 'band',
+      tick: { visible: false },
+      label: { visible: true },
+      grid: { visible: false },
+      domainLine: { visible: false },
+    },
+    {
+      orient: 'left',
+      type: 'linear',
+      tick: { visible: false },
+      label: { visible: true },
+      grid: { visible: true },
+      domainLine: { visible: false },
+    },
+  ];
+};
+
+export const getPortalChartDisplaySpec = (
+  spec,
+  { variant = 'bar', hideLegend = false } = {},
+) => {
+  if (!spec) {
+    return spec;
+  }
+
+  const nextSpec = {
+    ...spec,
+    animation: false,
+    title: spec.title
+      ? {
+          ...spec.title,
+          visible: false,
+        }
+      : spec.title,
+    padding:
+      variant === 'pie'
+        ? { top: 8, right: 6, bottom: 4, left: 6 }
+        : { top: 12, right: 4, bottom: 6, left: 0 },
+    legends: hideLegend
+      ? {
+          ...(spec.legends || {}),
+          visible: false,
+        }
+      : {
+          ...(spec.legends || {}),
+          visible: spec.legends?.visible ?? true,
+          orient: variant === 'pie' ? 'bottom' : 'top',
+        },
+    axes: buildPortalChartAxes(spec, variant),
+  };
+
+  if (variant === 'bar' && spec.bar) {
+    nextSpec.bar = {
+      ...spec.bar,
+      style: {
+        ...(spec.bar?.style || {}),
+        cornerRadius: 10,
+        fillOpacity: 0.94,
+      },
+    };
+  }
+
+  if (variant === 'line') {
+    nextSpec.line = {
+      ...(spec.line || {}),
+      style: {
+        ...(spec.line?.style || {}),
+        lineWidth: 3,
+      },
+    };
+    nextSpec.point = {
+      ...(spec.point || {}),
+      visible: true,
+      style: {
+        ...(spec.point?.style || {}),
+        size: 7,
+        lineWidth: 2,
+      },
+    };
+  }
+
+  if (variant === 'pie' && spec.pie) {
+    nextSpec.pie = {
+      ...spec.pie,
+      style: {
+        ...(spec.pie?.style || {}),
+        cornerRadius: 8,
+      },
+    };
+    nextSpec.label = {
+      ...(spec.label || {}),
+      visible: false,
+    };
+  }
+
+  return nextSpec;
 };
