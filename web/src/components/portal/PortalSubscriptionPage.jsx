@@ -75,6 +75,10 @@ const PortalSubscriptionPage = () => {
   const showSubscriptionSide = showRecentBillingCard;
   const showUsageProgress = billing.hasActiveSubscription;
   const hasPlanChoices = (billing.subscriptionCardProps?.plans?.length || 0) > 0;
+  const handleScrollToPlans = () => {
+    const plansSection = document.getElementById('portal-subscription-plans');
+    plansSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const purchaseGuideItems = [
     {
       key: 'plan',
@@ -134,10 +138,6 @@ const PortalSubscriptionPage = () => {
       value: billing.hasActiveSubscription ? billing.t('生效中') : billing.t('待开通'),
     },
   ];
-  const handleScrollToPlans = () => {
-    const plansSection = document.getElementById('portal-subscription-plans');
-    plansSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
 
   return (
     <div className='portal-overview portal-billing'>
