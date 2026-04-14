@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { Button, Card, Progress, Tag } from '@douyinfe/semi-ui';
 import { IconArrowRight, IconRefresh } from '@douyinfe/semi-icons';
+import { useNavigate } from 'react-router-dom';
 import { renderQuota } from '../../helpers';
 import SubscriptionPlansCard from '../topup/SubscriptionPlansCard';
 import usePortalBillingData from '../../hooks/portal/usePortalBillingData';
@@ -26,6 +27,7 @@ import PortalBillingOverlays from './PortalBillingOverlays';
 import PortalStateBlock from './PortalStateBlock';
 
 const PortalSubscriptionPage = () => {
+  const navigate = useNavigate();
   const billing = usePortalBillingData();
 
   if (billing.initializing && !billing.userState?.user) {
@@ -145,18 +147,24 @@ const PortalSubscriptionPage = () => {
         <div className='portal-page-head__main'>
           <div className='portal-page-head__eyebrow'>{billing.t('订阅中心')}</div>
           <h1 className='portal-page-head__title'>{billing.t('订阅与续费')}</h1>
-          <p className='portal-page-head__description'>
-            {billing.hasActiveSubscription
-              ? billing.t('先确认当前套餐状态，再直接续费或升级。')
-              : billing.t('先看当前状态，再直接从下方开通套餐。')}
-          </p>
         </div>
         <div className='portal-page-head__actions'>
+          <Button
+            theme='solid'
+            type='primary'
+            icon={<IconRefresh />}
+            size='small'
+            loading={billing.refreshing}
+            onClick={billing.refreshAll}
+          >
+            {billing.t('刷新数据')}
+          </Button>
           {!billing.hasActiveSubscription ? (
             <Button
-              theme='solid'
-              type='primary'
+              theme='light'
+              type='tertiary'
               icon={<IconArrowRight />}
+              size='small'
               onClick={handleScrollToPlans}
             >
               {billing.t('去选套餐')}
@@ -165,11 +173,11 @@ const PortalSubscriptionPage = () => {
           <Button
             theme='borderless'
             type='tertiary'
-            icon={<IconRefresh />}
-            loading={billing.refreshing}
-            onClick={billing.refreshAll}
+            icon={<IconArrowRight />}
+            size='small'
+            onClick={() => navigate('/app/logs')}
           >
-            {billing.t('刷新数据')}
+            {billing.t('扣费日志')}
           </Button>
         </div>
       </div>

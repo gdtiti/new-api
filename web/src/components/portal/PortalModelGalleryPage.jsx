@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { Button, Card } from '@douyinfe/semi-ui';
 import { useOutletContext } from 'react-router-dom';
-import { IconSearch } from '@douyinfe/semi-icons';
+import { IconActivity, IconHistogram, IconSearch } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import PricingPage from '../table/model-pricing/layout/PricingPage';
 import PortalTimeRangeBar from './PortalTimeRangeBar';
@@ -143,9 +143,36 @@ const PortalModelGalleryPage = () => {
               theme='solid'
               type='primary'
               icon={<IconSearch />}
-              onClick={() => gallery.navigateToModel(heroModel)}
+              size='small'
+              onClick={() =>
+                heroModel
+                  ? gallery.navigateToModel(heroModel)
+                  : gallery.navigateToAnalytics()
+              }
             >
-              {t('打开当前重点模型')}
+              {heroModel ? t('打开当前重点模型') : t('查看模型分析')}
+            </Button>
+            <Button
+              theme='light'
+              type='primary'
+              icon={<IconActivity />}
+              size='small'
+              onClick={() =>
+                heroModel
+                  ? gallery.navigateToLogs({ model_name: heroModel })
+                  : gallery.navigateToLogs()
+              }
+            >
+              {t('查看相关日志')}
+            </Button>
+            <Button
+              theme='borderless'
+              type='tertiary'
+              icon={<IconHistogram />}
+              size='small'
+              onClick={gallery.navigateToAnalytics}
+            >
+              {t('前往分析页')}
             </Button>
           </div>
         ) : null}

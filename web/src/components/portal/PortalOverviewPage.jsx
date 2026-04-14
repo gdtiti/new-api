@@ -207,6 +207,7 @@ const PortalOverviewPage = () => {
             theme='solid'
             type='primary'
             icon={<IconKey />}
+            size='small'
             onClick={overview.navigateToTokens}
           >
             {t('令牌中心')}
@@ -216,6 +217,7 @@ const PortalOverviewPage = () => {
               theme='light'
               type='primary'
               icon={<IconActivity />}
+              size='small'
               onClick={overview.navigateToAnalytics}
             >
               {t('数据分析')}

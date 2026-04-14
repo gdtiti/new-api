@@ -19,8 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useMemo } from 'react';
 import { Button, Card, Tabs } from '@douyinfe/semi-ui';
-import { IconDelete } from '@douyinfe/semi-icons';
-import { useSearchParams } from 'react-router-dom';
+import { IconArrowRight, IconDelete } from '@douyinfe/semi-icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import UsageLogsPage from '../table/usage-logs';
 import TaskLogsPage from '../table/task-logs';
@@ -29,6 +29,7 @@ import PortalStateBlock from './PortalStateBlock';
 
 const PortalLogsPage = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const activeTab = useMemo(() => {
@@ -128,11 +129,30 @@ const PortalLogsPage = () => {
           </h1>
         </div>
         <div className='portal-page-head__actions'>
+          <Button
+            theme='light'
+            type='primary'
+            icon={<IconArrowRight />}
+            size='small'
+            onClick={() => navigate('/app/overview')}
+          >
+            {t('返回总览')}
+          </Button>
+          <Button
+            theme='light'
+            type='tertiary'
+            icon={<IconArrowRight />}
+            size='small'
+            onClick={() => navigate('/app/models')}
+          >
+            {t('模型广场')}
+          </Button>
           {linkedFilters.length ? (
             <Button
               theme='borderless'
               type='tertiary'
               icon={<IconDelete />}
+              size='small'
               onClick={handleClearLinkedFilters}
             >
               {t('清空联动条件')}

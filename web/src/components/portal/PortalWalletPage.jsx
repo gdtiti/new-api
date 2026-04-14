@@ -79,10 +79,29 @@ const PortalWalletPage = () => {
             theme='solid'
             type='primary'
             icon={<IconRefresh />}
+            size='small'
             loading={billing.refreshing}
             onClick={billing.refreshAll}
           >
             {billing.t('刷新数据')}
+          </Button>
+          <Button
+            theme='light'
+            type='tertiary'
+            icon={<IconArrowRight />}
+            size='small'
+            onClick={() => navigate('/app/subscription')}
+          >
+            {billing.t('订阅中心')}
+          </Button>
+          <Button
+            theme='borderless'
+            type='tertiary'
+            icon={<IconArrowRight />}
+            size='small'
+            onClick={() => navigate('/app/logs')}
+          >
+            {billing.t('使用日志')}
           </Button>
         </div>
       </div>

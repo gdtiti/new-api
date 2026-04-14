@@ -255,6 +255,7 @@ const PortalAnalyticsPage = () => {
               theme='solid'
               type='primary'
               icon={<IconBolt />}
+              size='small'
               onClick={() =>
                 overview.navigateToLogs(
                   focusModel ? { model_name: focusModel } : {},
@@ -269,6 +270,7 @@ const PortalAnalyticsPage = () => {
               theme='borderless'
               type='tertiary'
               icon={<IconHistogram />}
+              size='small'
               onClick={() =>
                 topQuotaModel
                   ? overview.navigateToModel(topQuotaModel)

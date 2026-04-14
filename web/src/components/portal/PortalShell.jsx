@@ -27,6 +27,7 @@ import React, {
 import { Avatar, Button, Tag, Typography } from '@douyinfe/semi-ui';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  ArrowUpRight,
   BarChart3,
   Boxes,
   CreditCard,
@@ -369,18 +370,6 @@ const PortalShell = () => {
               <Title heading={3} className='!mb-0'>
                 {currentItem?.title || t('总览')}
               </Title>
-              <Text type='secondary'>
-                {currentItem?.description || t('统一查看客户侧经营与账户信息')}
-              </Text>
-              {statusTags.length > 0 ? (
-                <div className='portal-shell__title-meta'>
-                  {statusTags.map((tag) => (
-                    <Tag color={tag.color} key={tag.text} shape='circle' size='small'>
-                      {tag.text}
-                    </Tag>
-                  ))}
-                </div>
-              ) : null}
             </div>
           </div>
 
@@ -394,6 +383,7 @@ const PortalShell = () => {
             <Button
               icon={<KeyRound size={16} />}
               onClick={() => goTo('/app/tokens')}
+              size='small'
               theme='solid'
               type='primary'
             >
@@ -404,6 +394,7 @@ const PortalShell = () => {
               <Button
                 icon={<ShieldCheck size={16} />}
                 onClick={() => goTo('/console')}
+                size='small'
                 theme='outline'
                 type='tertiary'
               >
@@ -411,6 +402,15 @@ const PortalShell = () => {
               </Button>
             )}
 
+            <Button
+              icon={<ArrowUpRight size={16} />}
+              onClick={() => goTo('/pricing')}
+              size='small'
+              theme='outline'
+              type='tertiary'
+            >
+              {t('模型价格')}
+            </Button>
             <div className='portal-shell__user-chip'>
               <Avatar size='small' color='light-blue'>
                 {(user?.username || user?.display_name || 'U')
@@ -430,6 +430,7 @@ const PortalShell = () => {
             <Button
               icon={<LogOut size={16} />}
               onClick={handleLogout}
+              size='small'
               theme='borderless'
               type='tertiary'
             >
@@ -438,6 +439,33 @@ const PortalShell = () => {
           </div>
         </header>
 
+        <section className='portal-shell__hero'>
+          <div className='portal-shell__hero-grid'>
+            {heroStats.map((item) => (
+              <div className='portal-shell__hero-stat' key={item.key}>
+                <span className='portal-shell__hero-stat-label'>{item.label}</span>
+                <strong className='portal-shell__hero-stat-value'>
+                  {item.value}
+                </strong>
+                <small className='portal-shell__hero-stat-hint'>{item.hint}</small>
+              </div>
+            ))}
+          </div>
+
+          <div className='portal-shell__tags'>
+            {statusTags.length > 0 ? (
+              statusTags.map((tag) => (
+                <Tag color={tag.color} key={tag.text} shape='circle' size='small'>
+                  {tag.text}
+                </Tag>
+              ))
+            ) : (
+              <Tag color='grey' shape='circle' size='small'>
+                {t('基础认证已可用')}
+              </Tag>
+            )}
+          </div>
+        </section>
         <main className='portal-shell__content'>
           <Outlet
             context={{ portalSkinKey: activeSkin.key, portalSkin: activeSkin }}
