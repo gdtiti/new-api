@@ -221,6 +221,33 @@ const PortalShell = () => {
     t,
   ]);
 
+  const heroStats = useMemo(
+    () => [
+      {
+        key: 'section',
+        label: t('当前页面'),
+        value: currentItem?.title || t('总览'),
+        hint: currentItem?.description || t('统一查看客户侧经营与账户信息'),
+      },
+      {
+        key: 'navigation',
+        label: t('可用入口'),
+        value: String(navItems.length),
+        hint: t('已整理为紧凑导航视图'),
+      },
+      {
+        key: 'status',
+        label: t('状态标签'),
+        value: String(statusTags.length || 1),
+        hint:
+          statusTags.length > 0
+            ? t('已启用认证与账户能力')
+            : t('基础认证已可用'),
+      },
+    ],
+    [currentItem?.description, currentItem?.title, navItems.length, statusTags.length, t],
+  );
+
   const goTo = useCallback(
     (to) => {
       navigate(to);
