@@ -43,12 +43,50 @@
   --portal-text-muted: #4b5b72;
 }
 
-.portal-shell[data-portal-mode='dark'] {
+.portal-shell[data-portal-mode='dark'],
+.portal-shell[data-portal-skin$='-dark'] {
   --semi-color-text-0: var(--portal-text-primary);
   --semi-color-text-1: var(--portal-text-secondary);
   --semi-color-text-2: var(--portal-text-secondary);
   --semi-color-text-3: var(--portal-text-muted);
   color-scheme: dark;
+}
+
+.portal-shell[data-portal-mode='dark'] .portal-page,
+.portal-shell[data-portal-skin$='-dark'] .portal-page {
+  color: var(--portal-text-primary);
+}
+
+.portal-shell[data-portal-mode='dark'] .portal-page-head__title,
+.portal-shell[data-portal-mode='dark'] .portal-overview__metric-value,
+.portal-shell[data-portal-mode='dark'] .portal-overview__meta-chip strong,
+.portal-shell[data-portal-mode='dark'] .portal-overview__section-head h2,
+.portal-shell[data-portal-mode='dark'] .portal-analytics__section-head h2,
+.portal-shell[data-portal-skin$='-dark'] .portal-page-head__title,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__metric-value,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__meta-chip strong,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__section-head h2,
+.portal-shell[data-portal-skin$='-dark'] .portal-analytics__section-head h2 {
+  color: var(--portal-text-primary) !important;
+}
+
+.portal-shell[data-portal-mode='dark'] .portal-page-head__eyebrow,
+.portal-shell[data-portal-mode='dark'] .portal-overview__eyebrow,
+.portal-shell[data-portal-mode='dark'] .portal-overview__meta-chip,
+.portal-shell[data-portal-mode='dark'] .portal-overview__metric-label,
+.portal-shell[data-portal-mode='dark'] .portal-overview__metric-hint,
+.portal-shell[data-portal-mode='dark'] .portal-overview__summary-note,
+.portal-shell[data-portal-mode='dark'] .portal-range-bar .semi-form-field-label,
+.portal-shell[data-portal-mode='dark'] .portal-range-bar .semi-form-field-label-text,
+.portal-shell[data-portal-skin$='-dark'] .portal-page-head__eyebrow,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__eyebrow,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__meta-chip,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__metric-label,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__metric-hint,
+.portal-shell[data-portal-skin$='-dark'] .portal-overview__summary-note,
+.portal-shell[data-portal-skin$='-dark'] .portal-range-bar .semi-form-field-label,
+.portal-shell[data-portal-skin$='-dark'] .portal-range-bar .semi-form-field-label-text {
+  color: var(--portal-text-secondary) !important;
 }
 
 .portal-shell[data-portal-skin='pulse-light'] {

@@ -1704,11 +1704,7 @@ html.dark .auth-hub__side-card {
   }
 }
 
-.portal-shell,
-.portal-overview,
-.portal-model-gallery,
-.portal-billing,
-.portal-logs {
+.portal-shell {
   --portal-surface-strong: rgba(255, 255, 255, 0.86);
   --portal-surface-soft: rgba(248, 250, 252, 0.82);
   --portal-surface-muted: rgba(241, 245, 249, 0.78);
@@ -1725,10 +1721,7 @@ html.dark .auth-hub__side-card {
 }
 
 .portal-shell[data-portal-mode='dark'],
-.portal-shell[data-portal-mode='dark'] .portal-overview,
-.portal-shell[data-portal-mode='dark'] .portal-model-gallery,
-.portal-shell[data-portal-mode='dark'] .portal-billing,
-.portal-shell[data-portal-mode='dark'] .portal-logs {
+.portal-shell[data-portal-skin$='-dark'] {
   --portal-surface-strong: rgba(26, 27, 30, 0.86);
   --portal-surface-soft: rgba(30, 31, 34, 0.72);
   --portal-surface-muted: rgba(37, 38, 43, 0.72);
@@ -1736,9 +1729,9 @@ html.dark .auth-hub__side-card {
   --portal-border: rgba(255, 255, 255, 0.08);
   --portal-border-strong: rgba(255, 255, 255, 0.12);
   --portal-shadow: 0 18px 38px rgba(0, 0, 0, 0.4);
-  --portal-text-primary: #ffffff;
-  --portal-text-secondary: #a6a7ab;
-  --portal-text-muted: #909296;
+  --portal-text-primary: #f7fbff;
+  --portal-text-secondary: #c9d3e2;
+  --portal-text-muted: #a9b4c5;
 }
 
 .portal-panel {
