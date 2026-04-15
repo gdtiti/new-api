@@ -466,20 +466,8 @@ const PortalShell = () => {
           </div>
         </header>
 
-        <section className='portal-shell__hero'>
-          <div className='portal-shell__hero-grid'>
-            {heroStats.map((item) => (
-              <div className='portal-shell__hero-stat' key={item.key}>
-                <span className='portal-shell__hero-stat-label'>{item.label}</span>
-                <strong className='portal-shell__hero-stat-value'>
-                  {item.value}
-                </strong>
-                <small className='portal-shell__hero-stat-hint'>{item.hint}</small>
-              </div>
-            ))}
-          </div>
-
-          <div className='portal-shell__tags'>
+        <section className='portal-shell__hero portal-shell__hero--tags-only'>
+          <div className='portal-shell__tags' style={{ marginTop: 0 }}>
             {statusTags.length > 0 ? (
               statusTags.map((tag) => (
                 <Tag color={tag.color} key={tag.text} shape='circle' size='small'>
