@@ -1174,6 +1174,13 @@ html.dark .portal-shell__sidebar {
   padding: 20px;
 }
 
+html.dark .portal-shell__main {
+  background:
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 42%),
+    radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.08), transparent 45%),
+    rgba(18, 19, 23, 0.96);
+}
+
 .portal-shell__header {
   display: flex;
   justify-content: space-between;
@@ -1315,6 +1322,12 @@ html.dark .portal-shell__hero-stat {
   overflow: auto;
   border-radius: 20px;
   padding-bottom: 6px;
+}
+
+html.dark .portal-shell__content {
+  background: rgba(20, 22, 27, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* ==================== 统一认证中心 ==================== */
@@ -2997,7 +3010,7 @@ html.dark .portal-logs {
 .portal-model-gallery__hero-kpi {
   border-radius: var(--portal-radius-item);
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.66);
+  background: var(--portal-surface-elevated);
   border: 1px solid var(--portal-border-strong);
   display: flex;
   flex-direction: column;
@@ -3073,7 +3086,7 @@ html.dark .portal-model-gallery__hero-kpi {
   padding: 12px 14px;
   border-radius: var(--portal-radius-item);
   border: 1px solid var(--portal-border);
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--portal-surface-elevated);
 }
 
 html.dark .portal-model-gallery__insight-item {
@@ -3167,12 +3180,12 @@ html.dark .portal-model-gallery__insight-item {
   border-radius: 20px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--portal-surface-soft);
   backdrop-filter: blur(12px);
 }
 
 html.dark .pricing-page--portal .pricing-layout {
-  background: rgba(15, 23, 42, 0.48);
+  background: var(--portal-surface-soft);
   border-color: rgba(148, 163, 184, 0.16);
 }
 
