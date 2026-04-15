@@ -43,6 +43,14 @@
   --portal-text-muted: #4b5b72;
 }
 
+.portal-shell[data-portal-mode='dark'] {
+  --semi-color-text-0: var(--portal-text-primary);
+  --semi-color-text-1: var(--portal-text-secondary);
+  --semi-color-text-2: var(--portal-text-secondary);
+  --semi-color-text-3: var(--portal-text-muted);
+  color-scheme: dark;
+}
+
 .portal-shell[data-portal-skin='pulse-light'] {
   --portal-accent: #ff4d8d;
   --portal-accent-alt: #7c3aed;
