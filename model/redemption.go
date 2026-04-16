@@ -11,9 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// ErrRedeemFailed is returned when redemption fails due to internal error.
-var ErrRedeemFailed = errors.New("redeem.failed")
-
 type redeemBusinessError struct {
 	message string
 }
@@ -33,7 +30,6 @@ func isRedeemBusinessError(err error) bool {
 	var businessErr *redeemBusinessError
 	return errors.As(err, &businessErr)
 }
-
 type Redemption struct {
 	Id                    int            `json:"id"`
 	UserId                int            `json:"user_id"`
