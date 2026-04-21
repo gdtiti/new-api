@@ -3,21 +3,21 @@ package middleware
 import "testing"
 
 func TestResolveTokenUsingGroupFallsBackToUserGroupWhenTokenGroupEmpty(t *testing.T) {
-	group, err := resolveTokenUsingGroup("default", "")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	resolution := resolveTokenUsingGroup("default", "")
+	if !resolution.allowed() {
+		t.Fatalf("expected no denial, got %q", resolution.denyMessage)
 	}
-	if group != "default" {
-		t.Fatalf("expected default group, got %q", group)
+	if resolution.usingGroup != "default" {
+		t.Fatalf("expected default group, got %q", resolution.usingGroup)
 	}
 }
 
 func TestResolveTokenUsingGroupAllowsAutoTokenGroup(t *testing.T) {
-	group, err := resolveTokenUsingGroup("default", "auto")
-	if err != nil {
-		t.Fatalf("expected auto token group to be allowed, got %v", err)
+	resolution := resolveTokenUsingGroup("default", "auto")
+	if !resolution.allowed() {
+		t.Fatalf("expected auto token group to be allowed, got %q", resolution.denyMessage)
 	}
-	if group != "auto" {
-		t.Fatalf("expected auto group, got %q", group)
+	if resolution.usingGroup != "auto" {
+		t.Fatalf("expected auto group, got %q", resolution.usingGroup)
 	}
 }

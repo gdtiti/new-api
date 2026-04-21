@@ -218,6 +218,10 @@ func resolveTokenUsingGroup(userGroup, tokenGroup string) tokenGroupResolution {
 	if tokenGroup == "" {
 		return resolution
 	}
+	if tokenGroup == "auto" {
+		resolution.usingGroup = tokenGroup
+		return resolution
+	}
 	if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
 		resolution.denyMessage = fmt.Sprintf("无权访问 %s 分组", tokenGroup)
 		resolution.denyReason = tokenGroupDeniedReasonForbidden

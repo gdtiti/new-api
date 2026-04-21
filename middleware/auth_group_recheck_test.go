@@ -110,11 +110,11 @@ func TestResolveTokenUsingGroupWithRecheckSkipsAutoGroup(t *testing.T) {
 	if recheckCalls != 0 {
 		t.Fatalf("expected no recheck calls, got %d", recheckCalls)
 	}
-	if resolution.allowed() {
-		t.Fatal("expected auto group to preserve current deny result in this helper")
+	if !resolution.allowed() {
+		t.Fatalf("expected auto group to stay allowed, got %q", resolution.denyMessage)
 	}
-	if resolution.denyReason != tokenGroupDeniedReasonForbidden {
-		t.Fatalf("expected forbidden deny reason, got %s", resolution.denyReason)
+	if resolution.usingGroup != "auto" {
+		t.Fatalf("expected using group auto, got %q", resolution.usingGroup)
 	}
 }
 
