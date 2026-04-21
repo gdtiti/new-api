@@ -14,6 +14,7 @@ const (
 	StreamEndReasonDone        StreamEndReason = "done"
 	StreamEndReasonTimeout     StreamEndReason = "timeout"
 	StreamEndReasonClientGone  StreamEndReason = "client_gone"
+	StreamEndReasonWriteFail   StreamEndReason = "write_fail"
 	StreamEndReasonScannerErr  StreamEndReason = "scanner_error"
 	StreamEndReasonHandlerStop StreamEndReason = "handler_stop"
 	StreamEndReasonEOF         StreamEndReason = "eof"
@@ -29,9 +30,9 @@ type StreamErrorEntry struct {
 }
 
 type StreamStatus struct {
-	EndReason  StreamEndReason
-	EndError   error
-	endOnce    sync.Once
+	EndReason StreamEndReason
+	EndError  error
+	endOnce   sync.Once
 
 	mu         sync.Mutex
 	Errors     []StreamErrorEntry

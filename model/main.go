@@ -195,6 +195,10 @@ func InitDB() (err error) {
 		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
+		if err := ensureRuntimeSchemaCompatibility(); err != nil {
+			return err
+		}
+
 		if !common.IsMasterNode {
 			return nil
 		}
@@ -257,6 +261,7 @@ func migrateDB() error {
 
 	err := DB.AutoMigrate(
 		&Channel{},
+		&ChannelBaseURL{},
 		&Token{},
 		&User{},
 		&UserQuotaGrant{},
@@ -285,6 +290,9 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+	if err := migrateRedemptionEnhancements(); err != nil {
+		return err
+	}
 	if common.UsingSQLite {
 		if err := ensureSubscriptionPlanTableSQLite(); err != nil {
 			return err
@@ -306,6 +314,7 @@ func migrateDBFast() error {
 		name  string
 	}{
 		{&Channel{}, "Channel"},
+		{&ChannelBaseURL{}, "ChannelBaseURL"},
 		{&Token{}, "Token"},
 		{&User{}, "User"},
 		{&UserQuotaGrant{}, "UserQuotaGrant"},
@@ -328,6 +337,7 @@ func migrateDBFast() error {
 		{&SubscriptionOrder{}, "SubscriptionOrder"},
 		{&UserSubscription{}, "UserSubscription"},
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
+		{&RedemptionUsage{}, "RedemptionUsage"},
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
 	}
@@ -363,6 +373,9 @@ func migrateDBFast() error {
 			return err
 		}
 	}
+	if err := migrateRedemptionEnhancements(); err != nil {
+		return err
+	}
 	common.SysLog("database migrated")
 	return nil
 }
@@ -370,6 +383,67 @@ func migrateDBFast() error {
 func migrateLOGDB() error {
 	var err error
 	if err = LOG_DB.AutoMigrate(&Log{}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ensureRuntimeSchemaCompatibility() error {
+	if err := ensureMissingColumn(&Channel{}, "channels", "max_concurrency"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ensureMissingColumn(model interface{}, tableName string, columnName string) error {
+	if !DB.Migrator().HasTable(tableName) {
+		return nil
+	}
+	if DB.Migrator().HasColumn(model, columnName) {
+		return nil
+	}
+	if err := DB.Migrator().AddColumn(model, columnName); err != nil {
+		if isDuplicateColumnError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to add missing column %s.%s: %w", tableName, columnName, err)
+	}
+	common.SysLog(fmt.Sprintf("added missing column %s.%s for runtime compatibility", tableName, columnName))
+	return nil
+}
+
+func isDuplicateColumnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "duplicate column") ||
+		strings.Contains(message, "duplicate column name") ||
+		strings.Contains(message, "already exists")
+}
+
+func migrateRedemptionEnhancements() error {
+	if err := DB.AutoMigrate(&RedemptionUsage{}); err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("grant_type = '' OR grant_type IS NULL").
+		Update("grant_type", common.RedemptionGrantTypeQuota).Error; err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("max_redeem_count <= ?", 0).
+		Update("max_redeem_count", 1).Error; err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("redeemed_count = ? AND status = ?", 0, common.RedemptionCodeStatusUsed).
+		Update("redeemed_count", 1).Error; err != nil {
+		return err
+	}
+	if err := DB.Model(&Redemption{}).
+		Where("redeemed_count = ? AND used_user_id > ?", 0, 0).
+		Update("redeemed_count", 1).Error; err != nil {
 		return err
 	}
 	return nil

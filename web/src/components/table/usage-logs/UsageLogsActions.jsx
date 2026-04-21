@@ -43,9 +43,9 @@ const LogsActions = ({
   );
 
   return (
-    <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
+    <div className='portal-logs__stats flex flex-col md:flex-row justify-between items-start md:items-center gap-3 w-full'>
       <Skeleton loading={needSkeleton} active placeholder={placeholder}>
-        <Space>
+        <div className='portal-logs__stat-list'>
           <Tag
             color='blue'
             style={{
@@ -53,7 +53,7 @@ const LogsActions = ({
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
               padding: 13,
             }}
-            className='!rounded-lg'
+            className='!rounded-lg portal-logs__stat-chip portal-logs__stat-chip--quota'
           >
             {t('消耗额度')}: {renderQuota(stat.quota)}
           </Tag>
@@ -64,7 +64,7 @@ const LogsActions = ({
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
               padding: 13,
             }}
-            className='!rounded-lg'
+            className='!rounded-lg portal-logs__stat-chip'
           >
             RPM: {stat.rpm}
           </Tag>
@@ -76,18 +76,20 @@ const LogsActions = ({
               fontWeight: 500,
               padding: 13,
             }}
-            className='!rounded-lg'
+            className='!rounded-lg portal-logs__stat-chip'
           >
             TPM: {stat.tpm}
           </Tag>
-        </Space>
+        </div>
       </Skeleton>
 
-      <CompactModeToggle
-        compactMode={compactMode}
-        setCompactMode={setCompactMode}
-        t={t}
-      />
+      <div className='portal-logs__toggle'>
+        <CompactModeToggle
+          compactMode={compactMode}
+          setCompactMode={setCompactMode}
+          t={t}
+        />
+      </div>
     </div>
   );
 };

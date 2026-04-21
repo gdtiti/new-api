@@ -189,6 +189,71 @@ func WssAuth(c *gin.Context) {
 
 }
 
+type tokenGroupDeniedReason string
+
+const (
+	tokenGroupDeniedReasonNone       tokenGroupDeniedReason = ""
+	tokenGroupDeniedReasonForbidden  tokenGroupDeniedReason = "forbidden"
+	tokenGroupDeniedReasonDeprecated tokenGroupDeniedReason = "deprecated"
+)
+
+type tokenGroupResolution struct {
+	usingGroup  string
+	userGroup   string
+	tokenGroup  string
+	denyMessage string
+	denyReason  tokenGroupDeniedReason
+}
+
+func (r tokenGroupResolution) allowed() bool {
+	return r.denyReason == tokenGroupDeniedReasonNone
+}
+
+func resolveTokenUsingGroup(userGroup, tokenGroup string) tokenGroupResolution {
+	resolution := tokenGroupResolution{
+		usingGroup: userGroup,
+		userGroup:  userGroup,
+		tokenGroup: tokenGroup,
+	}
+	if tokenGroup == "" {
+		return resolution
+	}
+	if tokenGroup == "auto" {
+		resolution.usingGroup = tokenGroup
+		return resolution
+	}
+	if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
+		resolution.denyMessage = fmt.Sprintf("无权访问 %s 分组", tokenGroup)
+		resolution.denyReason = tokenGroupDeniedReasonForbidden
+		return resolution
+	}
+	if tokenGroup != "auto" && !ratio_setting.ContainsGroupRatio(tokenGroup) {
+		resolution.denyMessage = fmt.Sprintf("分组 %s 已被弃用", tokenGroup)
+		resolution.denyReason = tokenGroupDeniedReasonDeprecated
+		return resolution
+	}
+	resolution.usingGroup = tokenGroup
+	return resolution
+}
+
+func shouldRetryTokenGroupAuthorization(tokenGroup string, resolution tokenGroupResolution) bool {
+	return tokenGroup != "" &&
+		tokenGroup != "auto" &&
+		resolution.denyReason == tokenGroupDeniedReasonForbidden
+}
+
+func resolveTokenUsingGroupWithRecheck(initialUserGroup, initialTokenGroup string, recheck func() (string, string, error)) (tokenGroupResolution, bool, error) {
+	initialResolution := resolveTokenUsingGroup(initialUserGroup, initialTokenGroup)
+	if !shouldRetryTokenGroupAuthorization(initialTokenGroup, initialResolution) || recheck == nil {
+		return initialResolution, false, nil
+	}
+	recheckedUserGroup, recheckedTokenGroup, err := recheck()
+	if err != nil {
+		return initialResolution, true, err
+	}
+	return resolveTokenUsingGroup(recheckedUserGroup, recheckedTokenGroup), true, nil
+}
+
 // TokenOrUserAuth allows either session-based user auth or API token auth.
 // Used for endpoints that need to be accessible from both the dashboard and API clients.
 func TokenOrUserAuth() func(c *gin.Context) {
@@ -379,24 +444,66 @@ func TokenAuth() func(c *gin.Context) {
 
 		userCache.WriteContext(c)
 
-		userGroup := userCache.Group
-		tokenGroup := token.Group
-		if tokenGroup != "" {
-			// check common.UserUsableGroups[userGroup]
-			if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {
-				abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("无权访问 %s 分组", tokenGroup))
-				return
+		initialUserGroup := userCache.Group
+		initialTokenGroup := token.Group
+		recheckedUserGroup := initialUserGroup
+		recheckedTokenGroup := initialTokenGroup
+
+		groupResolution, rechecked, err := resolveTokenUsingGroupWithRecheck(initialUserGroup, initialTokenGroup, func() (string, string, error) {
+			refreshedToken, err := model.GetTokenByKey(token.Key, true)
+			if err != nil {
+				return "", "", err
 			}
-			// check group in common.GroupRatio
-			if !ratio_setting.ContainsGroupRatio(tokenGroup) {
-				if tokenGroup != "auto" {
-					abortWithOpenAiMessage(c, http.StatusForbidden, fmt.Sprintf("分组 %s 已被弃用", tokenGroup))
-					return
-				}
+			refreshedUserGroup, err := model.GetUserGroup(token.UserId, true)
+			if err != nil {
+				return "", "", err
 			}
-			userGroup = tokenGroup
+			token = refreshedToken
+			recheckedUserGroup = refreshedUserGroup
+			recheckedTokenGroup = refreshedToken.Group
+			return refreshedUserGroup, refreshedToken.Group, nil
+		})
+		if rechecked {
+			finalResult := "deny"
+			if err != nil {
+				finalResult = "error"
+			} else if groupResolution.allowed() {
+				finalResult = "allow"
+			}
+			logger.LogWarn(
+				c,
+				fmt.Sprintf(
+					"TokenAuth group recheck user_id=%d token=%s initial_user_group=%s initial_token_group=%s recheck_user_group=%s recheck_token_group=%s final=%s",
+					token.UserId,
+					token.GetMaskedKey(),
+					initialUserGroup,
+					initialTokenGroup,
+					recheckedUserGroup,
+					recheckedTokenGroup,
+					finalResult,
+				),
+			)
 		}
-		common.SetContextKey(c, constant.ContextKeyUsingGroup, userGroup)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				abortWithOpenAiMessage(c, http.StatusUnauthorized,
+					common.TranslateMessage(c, i18n.MsgTokenInvalid))
+			} else {
+				common.SysLog(fmt.Sprintf("TokenAuth group recheck database error for user %d token %s: %v", token.UserId, token.GetMaskedKey(), err))
+				abortWithOpenAiMessage(c, http.StatusInternalServerError,
+					common.TranslateMessage(c, i18n.MsgDatabaseError))
+			}
+			return
+		}
+		if !groupResolution.allowed() {
+			abortWithOpenAiMessage(c, http.StatusForbidden, groupResolution.denyMessage)
+			return
+		}
+		if rechecked {
+			userCache.Group = groupResolution.userGroup
+			userCache.WriteContext(c)
+		}
+		common.SetContextKey(c, constant.ContextKeyUsingGroup, groupResolution.usingGroup)
 
 		err = SetupContextForToken(c, token, parts...)
 		if err != nil {

@@ -44,8 +44,8 @@ const TaskLogsFilters = ({
       trigger='change'
       stopValidateWithError={false}
     >
-      <div className='flex flex-col gap-2'>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2'>
+      <div className='portal-logs__filter-form flex flex-col gap-3'>
+        <div className='portal-logs__filter-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2'>
           {/* 时间选择器 */}
           <div className='col-span-1 lg:col-span-2'>
             <Form.DatePicker
@@ -88,10 +88,10 @@ const TaskLogsFilters = ({
         </div>
 
         {/* 操作按钮区域 */}
-        <div className='flex justify-between items-center'>
-          <div></div>
-          <div className='flex gap-2'>
+        <div className='portal-logs__filter-toolbar flex flex-col sm:flex-row justify-end items-start sm:items-center gap-3'>
+          <div className='portal-logs__filter-actions flex flex-wrap gap-2 w-full sm:w-auto justify-end'>
             <Button
+              className='portal-logs__primary-action'
               type='tertiary'
               htmlType='submit'
               loading={loading}
@@ -100,6 +100,7 @@ const TaskLogsFilters = ({
               {t('查询')}
             </Button>
             <Button
+              className='portal-logs__secondary-action'
               type='tertiary'
               onClick={() => {
                 if (formApi) {
@@ -115,6 +116,7 @@ const TaskLogsFilters = ({
               {t('重置')}
             </Button>
             <Button
+              className='portal-logs__secondary-action'
               type='tertiary'
               onClick={() => setShowColumnSelector(true)}
               size='small'

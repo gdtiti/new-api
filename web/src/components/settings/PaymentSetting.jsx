@@ -18,15 +18,76 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState } from 'react';
-import { Card, Spin, Tabs } from '@douyinfe/semi-ui';
+import { Banner, Card, Spin, Space, Tag } from '@douyinfe/semi-ui';
 import SettingsGeneralPayment from '../../pages/Setting/Payment/SettingsGeneralPayment';
 import SettingsPaymentGateway from '../../pages/Setting/Payment/SettingsPaymentGateway';
 import SettingsPaymentGatewayStripe from '../../pages/Setting/Payment/SettingsPaymentGatewayStripe';
 import SettingsPaymentGatewayCreem from '../../pages/Setting/Payment/SettingsPaymentGatewayCreem';
 import SettingsPaymentGatewayWaffo from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffo';
-import SettingsPaymentGatewayWaffoPancake from '../../pages/Setting/Payment/SettingsPaymentGatewayWaffoPancake';
 import { API, showError, toBoolean } from '../../helpers';
 import { useTranslation } from 'react-i18next';
+
+const PAY_METHOD_LABELS = {
+  wxpay: '微信支付',
+  alipay: '支付宝',
+  qqpay: 'QQ 钱包',
+  paypal: 'PayPal',
+  stripe: 'Stripe',
+  usdt: 'USDT',
+};
+
+const parsePayMethods = (rawPayMethods) => {
+  if (!rawPayMethods) {
+    return [];
+  }
+
+  try {
+    const parsedPayMethods = JSON.parse(rawPayMethods);
+    if (Array.isArray(parsedPayMethods)) {
+      return parsedPayMethods
+        .map((item) => {
+          if (typeof item === 'string') {
+            const methodType = item.trim();
+            if (!methodType) {
+              return null;
+            }
+            return {
+              type: methodType,
+              name: PAY_METHOD_LABELS[methodType] || methodType,
+            };
+          }
+
+          if (!item || typeof item !== 'object') {
+            return null;
+          }
+
+          const methodType =
+            typeof item.type === 'string' ? item.type.trim() : '';
+          const methodName =
+            typeof item.name === 'string' ? item.name.trim() : '';
+
+          if (!methodType && !methodName) {
+            return null;
+          }
+
+          return {
+            type: methodType || methodName,
+            name: methodName || PAY_METHOD_LABELS[methodType] || methodType,
+          };
+        })
+        .filter(Boolean);
+    }
+  } catch (error) {}
+
+  return rawPayMethods
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((methodType) => ({
+      type: methodType,
+      name: PAY_METHOD_LABELS[methodType] || methodType,
+    }));
+};
 
 const PaymentSetting = () => {
   const { t } = useTranslation();
@@ -49,17 +110,6 @@ const PaymentSetting = () => {
     StripeUnitPrice: 8.0,
     StripeMinTopUp: 1,
     StripePromotionCodesEnabled: false,
-
-    WaffoPancakeEnabled: false,
-    WaffoPancakeSandbox: false,
-    WaffoPancakeMerchantID: '',
-    WaffoPancakePrivateKey: '',
-    WaffoPancakeStoreID: '',
-    WaffoPancakeProductID: '',
-    WaffoPancakeReturnURL: '',
-    WaffoPancakeCurrency: 'USD',
-    WaffoPancakeUnitPrice: 1.0,
-    WaffoPancakeMinTopUp: 1,
   });
 
   let [loading, setLoading] = useState(false);
@@ -93,6 +143,18 @@ const PaymentSetting = () => {
               newInputs['AmountOptions'] = item.value;
             }
             break;
+          case 'PayMethods':
+            try {
+              newInputs[item.key] = JSON.stringify(
+                JSON.parse(item.value),
+                null,
+                2,
+              );
+            } catch (error) {
+              console.error('解析PayMethods出错:', error);
+              newInputs[item.key] = item.value;
+            }
+            break;
           case 'payment_setting.amount_discount':
             try {
               newInputs['AmountDiscount'] = JSON.stringify(
@@ -108,20 +170,7 @@ const PaymentSetting = () => {
           case 'MinTopUp':
           case 'StripeUnitPrice':
           case 'StripeMinTopUp':
-          case 'WaffoPancakeUnitPrice':
-          case 'WaffoPancakeMinTopUp':
             newInputs[item.key] = parseFloat(item.value);
-            break;
-          case 'WaffoPancakeMerchantID':
-          case 'WaffoPancakePrivateKey':
-          case 'WaffoPancakeStoreID':
-          case 'WaffoPancakeProductID':
-          case 'WaffoPancakeReturnURL':
-          case 'WaffoPancakeCurrency':
-            newInputs[item.key] = item.value;
-            break;
-          case 'WaffoPancakeSandbox':
-            newInputs[item.key] = toBoolean(item.value);
             break;
           default:
             if (item.key.endsWith('Enabled')) {
@@ -133,7 +182,7 @@ const PaymentSetting = () => {
         }
       });
 
-      setInputs((prev) => ({ ...prev, ...newInputs }));
+      setInputs(newInputs);
     } else {
       showError(t(message));
     }
@@ -154,58 +203,52 @@ const PaymentSetting = () => {
     onRefresh();
   }, []);
 
+  const renderPayMethods = () => {
+    const methods = parsePayMethods(inputs.PayMethods);
+
+    if (methods.length === 0) {
+      return <Tag color='red'>{t('未配置')}</Tag>;
+    }
+
+    return (
+      <Space wrap>
+        {methods.map((method, index) => (
+          <Tag key={`${method.type}-${index}`} color='blue'>
+            {method.name}
+          </Tag>
+        ))}
+      </Space>
+    );
+  };
+
   return (
     <>
       <Spin spinning={loading} size='large'>
+        <Banner
+          fullMode={false}
+          type='info'
+          title={t('支付方式概览')}
+          description={
+            <div>
+              {t('当前支付方式')}：{renderPayMethods()}
+            </div>
+          }
+          style={{ marginTop: '10px' }}
+        />
         <Card style={{ marginTop: '10px' }}>
-          <Tabs
-            type='card'
-            defaultActiveKey='general'
-            contentStyle={{ paddingTop: 24 }}
-          >
-            <Tabs.TabPane tab={t('通用设置')} itemKey='general'>
-              <SettingsGeneralPayment
-                options={inputs}
-                refresh={onRefresh}
-                hideSectionTitle
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane tab={t('易支付设置')} itemKey='epay'>
-              <SettingsPaymentGateway
-                options={inputs}
-                refresh={onRefresh}
-                hideSectionTitle
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane tab={t('Stripe 设置')} itemKey='stripe'>
-              <SettingsPaymentGatewayStripe
-                options={inputs}
-                refresh={onRefresh}
-                hideSectionTitle
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane tab={t('Creem 设置')} itemKey='creem'>
-              <SettingsPaymentGatewayCreem
-                options={inputs}
-                refresh={onRefresh}
-                hideSectionTitle
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane tab={t('Waffo 设置')} itemKey='waffo'>
-              <SettingsPaymentGatewayWaffo
-                options={inputs}
-                refresh={onRefresh}
-                hideSectionTitle
-              />
-            </Tabs.TabPane>
-            {/*<Tabs.TabPane tab={t('Waffo Pancake 设置')} itemKey='waffo-pancake'>*/}
-            {/*  <SettingsPaymentGatewayWaffoPancake*/}
-            {/*    options={inputs}*/}
-            {/*    refresh={onRefresh}*/}
-            {/*    hideSectionTitle*/}
-            {/*  />*/}
-            {/*</Tabs.TabPane>*/}
-          </Tabs>
+          <SettingsGeneralPayment options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGateway options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGatewayStripe options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGatewayCreem options={inputs} refresh={onRefresh} />
+        </Card>
+        <Card style={{ marginTop: '10px' }}>
+          <SettingsPaymentGatewayWaffo options={inputs} refresh={onRefresh} />
         </Card>
       </Spin>
     </>

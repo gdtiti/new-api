@@ -102,6 +102,8 @@ var TelegramBotToken = ""
 var TelegramBotName = ""
 
 var QuotaForNewUser = 0
+var RegisterDefaultSubscriptionEnabled = false
+var RegisterDefaultSubscriptionPlanId = 0
 var QuotaForInviter = 0
 var QuotaForInvitee = 0
 var ChannelDisableThreshold = 5.0
@@ -205,6 +207,11 @@ const (
 	RedemptionCodeStatusEnabled  = 1 // don't use 0, 0 is the default value!
 	RedemptionCodeStatusDisabled = 2 // also don't use 0
 	RedemptionCodeStatusUsed     = 3 // also don't use 0
+)
+
+const (
+	RedemptionGrantTypeQuota        = "quota"
+	RedemptionGrantTypeSubscription = "subscription"
 )
 
 const (

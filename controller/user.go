@@ -188,6 +188,7 @@ func Register(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	model.GrantRegisterDefaultSubscriptionForUser(cleanUser.Id)
 
 	// 获取插入后的用户ID
 	var insertedUser model.User
@@ -841,11 +842,10 @@ func CreateUser(c *gin.Context) {
 }
 
 type ManageRequest struct {
-	Id       int    `json:"id"`
-	Action   string `json:"action"`
-	Value    int    `json:"value"`
-	Mode     string `json:"mode"`
-	ExpireAt int64  `json:"expire_at"`
+	Id     int    `json:"id"`
+	Action string `json:"action"`
+	Value  int    `json:"value"`
+	Mode   string `json:"mode"`
 }
 
 // ManageUser Only admin user can do this
@@ -892,11 +892,6 @@ func ManageUser(c *gin.Context) {
 			})
 			return
 		}
-		// 删除用户后，强制清理 Redis 中所有该用户令牌的缓存，
-		// 避免已缓存的令牌在 TTL 过期前仍能通过 TokenAuth 校验。
-		if err := model.InvalidateUserTokensCache(user.Id); err != nil {
-			common.SysLog(fmt.Sprintf("failed to invalidate tokens cache for user %d: %s", user.Id, err.Error()))
-		}
 	case "promote":
 		if myRole != common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserAdminCannotPromote)
@@ -919,27 +914,18 @@ func ManageUser(c *gin.Context) {
 		user.Role = common.RoleCommonUser
 	case "add_quota":
 		adminName := c.GetString("username")
-		adminId := c.GetInt("id")
-		adminInfo := map[string]interface{}{
-			"admin_id":       adminId,
-			"admin_username": adminName,
-		}
 		switch req.Mode {
 		case "add":
 			if req.Value <= 0 {
 				common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
 				return
 			}
-			if req.ExpireAt > 0 && req.ExpireAt <= common.GetTimestamp() {
-				common.ApiErrorMsg(c, "临时额度到期时间必须晚于当前时间")
-				return
-			}
-			if err := model.GrantUserQuota(user.Id, req.Value, req.ExpireAt, model.UserQuotaGrantSourceAdmin, adminName); err != nil {
+			if err := model.IncreaseUserQuota(user.Id, req.Value, true); err != nil {
 				common.ApiError(c, err)
 				return
 			}
-			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
-				fmt.Sprintf("管理员增加用户额度 %s", logger.LogQuota(req.Value)), adminInfo)
+			model.RecordLog(user.Id, model.LogTypeManage,
+				fmt.Sprintf("管理员(%s)增加用户额度 %s", adminName, logger.LogQuota(req.Value)))
 		case "subtract":
 			if req.Value <= 0 {
 				common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
@@ -949,16 +935,16 @@ func ManageUser(c *gin.Context) {
 				common.ApiError(c, err)
 				return
 			}
-			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
-				fmt.Sprintf("管理员减少用户额度 %s", logger.LogQuota(req.Value)), adminInfo)
+			model.RecordLog(user.Id, model.LogTypeManage,
+				fmt.Sprintf("管理员(%s)减少用户额度 %s", adminName, logger.LogQuota(req.Value)))
 		case "override":
 			oldQuota := user.Quota
-			if err := model.ReplaceUserQuota(user.Id, req.Value, model.UserQuotaGrantSourceAdminReplace, adminName); err != nil {
+			if err := model.DB.Model(&model.User{}).Where("id = ?", user.Id).Update("quota", req.Value).Error; err != nil {
 				common.ApiError(c, err)
 				return
 			}
-			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
-				fmt.Sprintf("管理员覆盖用户额度从 %s 为 %s", logger.LogQuota(oldQuota), logger.LogQuota(req.Value)), adminInfo)
+			model.RecordLog(user.Id, model.LogTypeManage,
+				fmt.Sprintf("管理员(%s)覆盖用户额度从 %s 为 %s", adminName, logger.LogQuota(oldQuota), logger.LogQuota(req.Value)))
 		default:
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
@@ -973,18 +959,6 @@ func ManageUser(c *gin.Context) {
 	if err := user.Update(false); err != nil {
 		common.ApiError(c, err)
 		return
-	}
-	// 禁用 / 角色调整后，强制失效用户缓存与其全部令牌缓存，
-	// 避免在 Redis TTL 过期前仍使用旧状态（尤其是禁用后仍可发起请求的问题）。
-	// InvalidateUserCache 会让下一次 GetUserCache 从数据库重新加载，
-	// InvalidateUserTokensCache 则确保令牌侧的缓存也同步刷新。
-	if req.Action == "disable" || req.Action == "promote" || req.Action == "demote" {
-		if err := model.InvalidateUserCache(user.Id); err != nil {
-			common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d: %s", user.Id, err.Error()))
-		}
-		if err := model.InvalidateUserTokensCache(user.Id); err != nil {
-			common.SysLog(fmt.Sprintf("failed to invalidate tokens cache for user %d: %s", user.Id, err.Error()))
-		}
 	}
 	clearUser := model.User{
 		Role:   user.Role,
@@ -1107,11 +1081,7 @@ func TopUp(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    result,
-	})
+	common.ApiSuccess(c, result)
 }
 
 type UpdateUserSettingRequest struct {

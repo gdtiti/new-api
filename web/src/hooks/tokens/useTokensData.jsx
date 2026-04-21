@@ -97,7 +97,6 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
     setTokenCount(payload.total || 0);
     setActivePage(payload.page || 1);
     setPageSize(payload.page_size || pageSize);
-    setShowKeys({});
   };
 
   // Load tokens function
@@ -213,13 +212,12 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
 
   // Open link function for chat integrations
   const onOpenLink = async (type, url, record) => {
-    const fullKey = await fetchTokenKey(record);
     if (url && url.startsWith('ccswitch')) {
-      openCCSwitchModal(fullKey);
+      openCCSwitchModal(record.key);
       return;
     }
     if (url && url.startsWith('fluent')) {
-      openFluentNotification(fullKey);
+      openFluentNotification(record.key);
       return;
     }
     let status = localStorage.getItem('status');
@@ -235,7 +233,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
       let cherryConfig = {
         id: 'new-api',
         baseUrl: serverAddress,
-        apiKey: `sk-${fullKey}`,
+        apiKey: 'sk-' + record.key,
       };
       let encodedConfig = encodeURIComponent(
         encodeToBase64(JSON.stringify(cherryConfig)),
@@ -245,7 +243,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
       let aionuiConfig = {
         platform: 'new-api',
         baseUrl: serverAddress,
-        apiKey: `sk-${fullKey}`,
+        apiKey: 'sk-' + record.key,
       };
       let encodedConfig = encodeURIComponent(
         encodeToBase64(JSON.stringify(aionuiConfig)),
@@ -254,7 +252,7 @@ export const useTokensData = (openFluentNotification, openCCSwitchModal) => {
     } else {
       let encodedServerAddress = encodeURIComponent(serverAddress);
       url = url.replaceAll('{address}', encodedServerAddress);
-      url = url.replaceAll('{key}', `sk-${fullKey}`);
+      url = url.replaceAll('{key}', 'sk-' + record.key);
     }
 
     window.open(url, '_blank');

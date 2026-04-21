@@ -85,18 +85,202 @@ export const updateChartSpec = (
   subtitle,
   newColors,
   dataId,
+  chartTheme = null,
+  colorMode = 'specified',
 ) => {
-  setterFunc((prev) => ({
-    ...prev,
-    data: [{ id: dataId, values: newData }],
-    title: {
-      ...prev.title,
-      subtext: subtitle,
+  setterFunc((prev) => {
+    const nextSpec = {
+      ...prev,
+      data: [{ id: dataId, values: newData }],
+      title: {
+        ...prev.title,
+        subtext: subtitle,
+      },
+      color:
+        colorMode === 'range'
+          ? {
+              ...(prev.color || {}),
+              type: 'ordinal',
+              range: newColors,
+            }
+          : {
+              ...(prev.color || {}),
+              specified: newColors,
+            },
+    };
+
+    return applyChartThemeToSpec(nextSpec, chartTheme);
+  });
+};
+
+const applyLegendTheme = (legends, chartTheme) => {
+  if (!legends) {
+    return legends;
+  }
+
+  const decorateLegend = (legend) => ({
+    ...legend,
+    item: {
+      ...(legend?.item || {}),
+      label: {
+        ...(legend?.item?.label || {}),
+        style: {
+          ...(legend?.item?.label?.style || {}),
+          fill: chartTheme.legendTextColor,
+        },
+      },
     },
-    color: {
-      specified: newColors,
+  });
+
+  return Array.isArray(legends)
+    ? legends.map(decorateLegend)
+    : decorateLegend(legends);
+};
+
+export const applyChartThemeToSpec = (spec, chartTheme) => {
+  if (!chartTheme) {
+    return spec;
+  }
+
+  const nextSpec = {
+    ...spec,
+    background: {
+      ...(spec.background || {}),
+      fill: 'transparent',
     },
-  }));
+    title: spec.title
+      ? {
+          ...spec.title,
+          textStyle: {
+            ...(spec.title?.textStyle || {}),
+            fill: chartTheme.titleColor,
+          },
+          subtextStyle: {
+            ...(spec.title?.subtextStyle || {}),
+            fill: chartTheme.subtextColor,
+          },
+        }
+      : spec.title,
+    label: spec.label
+      ? {
+          ...spec.label,
+          style: {
+            ...(spec.label?.style || {}),
+            fill: chartTheme.labelColor,
+          },
+        }
+      : spec.label,
+    legends: applyLegendTheme(spec.legends, chartTheme),
+    tooltip: spec.tooltip
+      ? {
+          ...spec.tooltip,
+          panel: {
+            ...(spec.tooltip?.panel || {}),
+            style: {
+              ...(spec.tooltip?.panel?.style || {}),
+              fill: chartTheme.tooltipBackground,
+              stroke: chartTheme.tooltipBorderColor,
+            },
+          },
+          style: {
+            ...(spec.tooltip?.style || {}),
+            fill: chartTheme.tooltipTextColor,
+          },
+        }
+      : spec.tooltip,
+  };
+
+  if (Array.isArray(spec.axes)) {
+    nextSpec.axes = spec.axes.map((axis) => ({
+      ...axis,
+      domainLine: {
+        ...(axis?.domainLine || {}),
+        style: {
+          ...(axis?.domainLine?.style || {}),
+          stroke: chartTheme.axisLineColor,
+        },
+      },
+      grid: axis?.visible === false
+        ? axis.grid
+        : {
+            ...(axis?.grid || {}),
+            visible: axis?.grid?.visible ?? axis?.orient !== 'bottom',
+            style: {
+              ...(axis?.grid?.style || {}),
+              stroke: chartTheme.gridColor,
+              lineDash: [4, 4],
+            },
+          },
+      label: axis?.label
+        ? {
+            ...axis.label,
+            style: {
+              ...(axis?.label?.style || {}),
+              fill: chartTheme.axisTextColor,
+            },
+          }
+        : {
+            style: {
+              fill: chartTheme.axisTextColor,
+            },
+          },
+      title: axis?.title
+        ? {
+            ...axis.title,
+            style: {
+              ...(axis?.title?.style || {}),
+              fill: chartTheme.subtextColor,
+            },
+          }
+        : axis.title,
+    }));
+  }
+
+  if (nextSpec.bar?.state?.hover) {
+    nextSpec.bar = {
+      ...nextSpec.bar,
+      state: {
+        ...nextSpec.bar.state,
+        hover: {
+          ...nextSpec.bar.state.hover,
+          stroke: chartTheme.hoverStroke,
+        },
+      },
+    };
+  }
+
+  if (nextSpec.pie?.state?.hover || nextSpec.pie?.state?.selected) {
+    nextSpec.pie = {
+      ...nextSpec.pie,
+      state: {
+        ...(nextSpec.pie?.state || {}),
+        hover: nextSpec.pie?.state?.hover
+          ? {
+              ...nextSpec.pie.state.hover,
+              stroke: chartTheme.hoverStroke,
+            }
+          : nextSpec.pie?.state?.hover,
+        selected: nextSpec.pie?.state?.selected
+          ? {
+              ...nextSpec.pie.state.selected,
+              stroke: chartTheme.hoverStroke,
+            }
+          : nextSpec.pie?.state?.selected,
+      },
+    };
+  }
+
+  if (nextSpec.area?.style) {
+    nextSpec.area = {
+      ...nextSpec.area,
+      style: {
+        ...nextSpec.area.style,
+        fillOpacity: chartTheme.areaOpacity,
+      },
+    };
+  }
+
+  return nextSpec;
 };
 
 export const getTrendSpec = (data, color) => ({

@@ -40,6 +40,7 @@ const ModelSetting = () => {
     'claude.default_max_tokens': '',
     'claude.thinking_adapter_budget_tokens_percentage': 0.8,
     'global.pass_through_request_enabled': false,
+    'global.openai_downstream_strict_upstream_enabled': false,
     'global.thinking_model_blacklist': '[]',
     'global.chat_completions_to_responses_policy': '{}',
     'general_setting.ping_interval_enabled': false,

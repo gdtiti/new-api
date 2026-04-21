@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useState, useEffect, useContext, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { API, copy, showError, showInfo, showSuccess } from '../../helpers';
 import { Modal } from '@douyinfe/semi-ui';
 import { UserContext } from '../../context/User';
@@ -26,8 +27,11 @@ import { StatusContext } from '../../context/Status';
 
 export const useModelPricingData = () => {
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const compositionRef = useRef({ isComposition: false });
+  const openedFromQueryRef = useRef('');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [modalImageUrl, setModalImageUrl] = useState('');
   const [isModalOpenurl, setIsModalOpenurl] = useState(false);
@@ -73,7 +77,7 @@ export const useModelPricingData = () => {
     [statusState],
   );
 
-  // 默认货币与站点展示类型同步；TOKENS 由视图层走倍率展示
+  // 默认货币与站点展示类型同步（USD/CNY），TOKENS 时仍允许切换视图内货币
   const siteDisplayType = useMemo(
     () => statusState?.status?.quota_display_type || 'USD',
     [statusState],
@@ -85,13 +89,6 @@ export const useModelPricingData = () => {
       siteDisplayType === 'CUSTOM'
     ) {
       setCurrency(siteDisplayType);
-    }
-  }, [siteDisplayType]);
-
-  useEffect(() => {
-    if (siteDisplayType === 'TOKENS') {
-      setShowWithRecharge(false);
-      setCurrency('USD');
     }
   }, [siteDisplayType]);
 
@@ -315,9 +312,55 @@ export const useModelPricingData = () => {
     }, 300);
   };
 
+  const navigateToModelLogs = (modelName) => {
+    const next = new URLSearchParams();
+    next.set('tab', 'api');
+    if (modelName) {
+      next.set('model_name', modelName);
+    }
+    navigate(`/app/logs?${next.toString()}`);
+  };
+
   useEffect(() => {
     refresh().then();
   }, []);
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search);
+    const keyword =
+      search.get('q') || search.get('model_name') || search.get('model') || '';
+    if (!keyword) {
+      return;
+    }
+    setSearchValue(keyword);
+  }, [location.search]);
+
+  useEffect(() => {
+    if (models.length === 0) {
+      return;
+    }
+
+    const search = new URLSearchParams(location.search);
+    const exactModel = search.get('model');
+    if (!exactModel) {
+      openedFromQueryRef.current = '';
+      return;
+    }
+    if (openedFromQueryRef.current === exactModel.toLowerCase()) {
+      return;
+    }
+
+    const matchedModel = models.find(
+      (model) => model.model_name?.toLowerCase() === exactModel.toLowerCase(),
+    );
+    if (!matchedModel) {
+      return;
+    }
+
+    setSelectedModel(matchedModel);
+    setShowModelDetail(true);
+    openedFromQueryRef.current = exactModel.toLowerCase();
+  }, [location.search, models]);
 
   // 当筛选条件变化时重置到第一页
   useEffect(() => {
@@ -363,7 +406,6 @@ export const useModelPricingData = () => {
     setCurrentPage,
     currency,
     setCurrency,
-    siteDisplayType,
     showWithRecharge,
     setShowWithRecharge,
     tokenUnit,
@@ -398,6 +440,7 @@ export const useModelPricingData = () => {
     handleGroupClick,
     openModelDetail,
     closeModelDetail,
+    navigateToModelLogs,
 
     // 引用
     compositionRef,

@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   API,
   getLogo,
@@ -28,6 +28,7 @@ import {
   updateAPI,
   getSystemName,
   getOAuthProviderIcon,
+  resolvePostLoginTarget,
   setUserData,
   onDiscordOAuthClicked,
   onCustomOAuthClicked,
@@ -67,6 +68,7 @@ import { SiDiscord } from 'react-icons/si';
 
 const RegisterForm = () => {
   let navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const githubButtonTextKeyByState = {
     idle: '使用 GitHub 继续',
@@ -198,7 +200,7 @@ const RegisterForm = () => {
         localStorage.setItem('user', JSON.stringify(data));
         setUserData(data);
         updateAPI();
-        navigate('/');
+        navigate(resolvePostLoginTarget(data, location.state));
         showSuccess('登录成功！');
         setShowWeChatLoginModal(false);
       } else {
@@ -382,7 +384,7 @@ const RegisterForm = () => {
         showSuccess('登录成功！');
         setUserData(data);
         updateAPI();
-        navigate('/');
+        navigate(resolvePostLoginTarget(data, location.state));
       } else {
         showError(message);
       }

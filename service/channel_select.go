@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -16,6 +17,7 @@ type RetryParam struct {
 	TokenGroup   string
 	ModelName    string
 	Retry        *int
+	ChannelFilter model.ChannelFilter
 	resetNextTry bool
 }
 
@@ -43,6 +45,49 @@ func (p *RetryParam) IncreaseRetry() {
 
 func (p *RetryParam) ResetRetryNextTry() {
 	p.resetNextTry = true
+}
+
+func composeChannelFilter(baseFilter model.ChannelFilter, extraFilter model.ChannelFilter) model.ChannelFilter {
+	if baseFilter == nil {
+		return extraFilter
+	}
+	if extraFilter == nil {
+		return baseFilter
+	}
+	return func(channel *model.Channel) bool {
+		return baseFilter(channel) && extraFilter(channel)
+	}
+}
+
+func selectChannelAndReserve(ctx *gin.Context, group string, modelName string, retry int, baseFilter model.ChannelFilter) (*model.Channel, error) {
+	excludedChannelIDs := make(map[int]struct{})
+
+	for {
+		filter := composeChannelFilter(baseFilter, func(channel *model.Channel) bool {
+			if channel == nil {
+				return false
+			}
+			if _, excluded := excludedChannelIDs[channel.Id]; excluded {
+				return false
+			}
+			if !IsChannelConcurrencyAvailable(channel) {
+				excludedChannelIDs[channel.Id] = struct{}{}
+				logger.LogWarn(ctx, fmt.Sprintf("skip saturated channel during scheduling: channel_id=%d, channel_name=%s, group=%s, model=%s, retry=%d, max_concurrency=%d", channel.Id, channel.Name, group, modelName, retry, channel.GetMaxConcurrency()))
+				return false
+			}
+			return true
+		})
+
+		channel, err := model.GetRandomSatisfiedChannelWithFilter(group, modelName, retry, filter)
+		if err != nil || channel == nil {
+			return channel, err
+		}
+		if TryAcquireChannelConcurrency(ctx, channel) {
+			return channel, nil
+		}
+		logger.LogWarn(ctx, fmt.Sprintf("channel concurrency acquire lost race, retry select: channel_id=%d, channel_name=%s, group=%s, model=%s, retry=%d, max_concurrency=%d", channel.Id, channel.Name, group, modelName, retry, channel.GetMaxConcurrency()))
+		excludedChannelIDs[channel.Id] = struct{}{}
+	}
 }
 
 // CacheGetRandomSatisfiedChannel tries to get a random channel that satisfies the requirements.
@@ -115,7 +160,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			}
 			logger.LogDebug(param.Ctx, "Auto selecting group: %s, priorityRetry: %d", autoGroup, priorityRetry)
 
-			channel, _ = model.GetRandomSatisfiedChannel(autoGroup, param.ModelName, priorityRetry)
+			channel, _ = selectChannelAndReserve(param.Ctx, autoGroup, param.ModelName, priorityRetry, param.ChannelFilter)
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
 				// 当前分组没有该模型的可用渠道，尝试下一个分组
@@ -153,7 +198,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			break
 		}
 	} else {
-		channel, err = model.GetRandomSatisfiedChannel(param.TokenGroup, param.ModelName, param.GetRetry())
+		channel, err = selectChannelAndReserve(param.Ctx, param.TokenGroup, param.ModelName, param.GetRetry(), param.ChannelFilter)
 		if err != nil {
 			return nil, param.TokenGroup, err
 		}

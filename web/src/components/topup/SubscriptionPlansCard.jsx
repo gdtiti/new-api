@@ -89,6 +89,7 @@ const SubscriptionPlansCard = ({
   const [paying, setPaying] = useState(false);
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const portalVariant = !withCard;
 
   const epayMethods = useMemo(() => getEpayMethods(payMethods), [payMethods]);
 
@@ -252,7 +253,13 @@ const SubscriptionPlansCard = ({
   };
 
   const cardContent = (
-    <>
+    <div
+      className={
+        portalVariant
+          ? 'subscription-plans subscription-plans--portal'
+          : 'subscription-plans'
+      }
+    >
       {/* 卡片头部 */}
       {loading ? (
         <div className='space-y-4'>
@@ -302,13 +309,23 @@ const SubscriptionPlansCard = ({
       ) : (
         <Space vertical style={{ width: '100%' }} spacing={8}>
           {/* 当前订阅状态 */}
-          <Card className='!rounded-xl w-full' bodyStyle={{ padding: '12px' }}>
+          <Card
+            className='!rounded-xl w-full subscription-plans__status-card'
+            bodyStyle={{ padding: '12px' }}
+          >
             <div className='flex items-center justify-between mb-2 gap-3'>
               <div className='flex items-center gap-2 flex-1 min-w-0'>
-                <Text strong>{t('我的订阅')}</Text>
+                <Text
+                  strong
+                  className={
+                    portalVariant ? 'subscription-plans__heading' : undefined
+                  }
+                >
+                  {t('我的订阅')}
+                </Text>
                 {hasActiveSubscription ? (
                   <Tag
-                    color='white'
+                    color='green'
                     size='small'
                     shape='circle'
                     prefixIcon={<Badge dot type='success' />}
@@ -316,12 +333,12 @@ const SubscriptionPlansCard = ({
                     {activeSubscriptions.length} {t('个生效中')}
                   </Tag>
                 ) : (
-                  <Tag color='white' size='small' shape='circle'>
+                  <Tag color='grey' size='small' shape='circle'>
                     {t('无生效')}
                   </Tag>
                 )}
                 {allSubscriptions.length > activeSubscriptions.length && (
-                  <Tag color='white' size='small' shape='circle'>
+                  <Tag color='grey' size='small' shape='circle'>
                     {allSubscriptions.length - activeSubscriptions.length}{' '}
                     {t('个已过期')}
                   </Tag>
@@ -367,7 +384,13 @@ const SubscriptionPlansCard = ({
               </div>
             </div>
             {disableSubscriptionPreference && isSubscriptionPreference && (
-              <Text type='tertiary' size='small'>
+              <Text
+                type='tertiary'
+                size='small'
+                className={
+                  portalVariant ? 'subscription-plans__summary-meta' : undefined
+                }
+              >
                 {t('已保存偏好为')}
                 {subscriptionPreferenceLabel}
                 {t('，当前无生效订阅，将自动使用钱包')}
@@ -402,14 +425,14 @@ const SubscriptionPlansCard = ({
                         {/* 订阅概要 */}
                         <div className='flex items-center justify-between text-xs mb-2'>
                           <div className='flex items-center gap-2'>
-                            <span className='font-medium'>
+                            <span className='subscription-plans__summary-label'>
                               {planTitle
                                 ? `${planTitle} · ${t('订阅')} #${subscription?.id}`
                                 : `${t('订阅')} #${subscription?.id}`}
                             </span>
                             {isActive ? (
                               <Tag
-                                color='white'
+                                color='green'
                                 size='small'
                                 shape='circle'
                                 prefixIcon={<Badge dot type='success' />}
@@ -417,22 +440,22 @@ const SubscriptionPlansCard = ({
                                 {t('生效')}
                               </Tag>
                             ) : isCancelled ? (
-                              <Tag color='white' size='small' shape='circle'>
+                              <Tag color='grey' size='small' shape='circle'>
                                 {t('已作废')}
                               </Tag>
                             ) : (
-                              <Tag color='white' size='small' shape='circle'>
+                              <Tag color='grey' size='small' shape='circle'>
                                 {t('已过期')}
                               </Tag>
                             )}
                           </div>
                           {isActive && (
-                            <span className='text-gray-500'>
+                            <span className='subscription-plans__summary-meta'>
                               {t('剩余')} {remainDays} {t('天')}
                             </span>
                           )}
                         </div>
-                        <div className='text-xs text-gray-500 mb-2'>
+                        <div className='subscription-plans__summary-meta mb-2 text-xs'>
                           {isActive
                             ? t('至')
                             : isCancelled
@@ -443,14 +466,14 @@ const SubscriptionPlansCard = ({
                           ).toLocaleString()}
                         </div>
                         {isActive && subscription?.next_reset_time > 0 && (
-                          <div className='text-xs text-gray-500 mb-2'>
+                          <div className='subscription-plans__summary-meta mb-2 text-xs'>
                             {t('下一次重置')}:{' '}
                             {new Date(
                               subscription.next_reset_time * 1000,
                             ).toLocaleString()}
                           </div>
                         )}
-                        <div className='text-xs text-gray-500 mb-2'>
+                        <div className='subscription-plans__summary-meta mb-2 text-xs'>
                           {t('总额度')}:{' '}
                           {totalAmount > 0 ? (
                             <Tooltip
@@ -478,7 +501,7 @@ const SubscriptionPlansCard = ({
                 </div>
               </>
             ) : (
-              <div className='text-xs text-gray-500'>
+              <div className='subscription-plans__summary-meta text-xs'>
                 {t('购买套餐后即可享受模型权益')}
               </div>
             )}
@@ -528,8 +551,8 @@ const SubscriptionPlansCard = ({
                 return (
                   <Card
                     key={plan?.id}
-                    className={`!rounded-xl transition-all hover:shadow-lg w-full h-full ${
-                      isPopular ? 'ring-2 ring-purple-500' : ''
+                    className={`!rounded-xl transition-all hover:shadow-lg w-full h-full subscription-plans__plan-card ${
+                      isPopular ? 'subscription-plans__plan-card--popular' : ''
                     }`}
                     bodyStyle={{ padding: 0 }}
                   >
@@ -558,6 +581,11 @@ const SubscriptionPlansCard = ({
                             size='small'
                             ellipsis={{ rows: 1, showTooltip: true }}
                             style={{ display: 'block' }}
+                            className={
+                              portalVariant
+                                ? 'subscription-plans__summary-meta'
+                                : undefined
+                            }
                           >
                             {plan.subtitle}
                           </Text>
@@ -567,10 +595,10 @@ const SubscriptionPlansCard = ({
                       {/* 价格区域 */}
                       <div className='py-2'>
                         <div className='flex items-baseline justify-start'>
-                          <span className='text-xl font-bold text-purple-600'>
+                          <span className='subscription-plans__price-symbol text-xl font-bold'>
                             {symbol}
                           </span>
-                          <span className='text-3xl font-bold text-purple-600'>
+                          <span className='subscription-plans__price-amount text-3xl font-bold'>
                             {displayPrice}
                           </span>
                         </div>
@@ -580,7 +608,7 @@ const SubscriptionPlansCard = ({
                       <div className='flex flex-col items-start gap-1 pb-2'>
                         {planBenefits.map((item) => {
                           const content = (
-                            <div className='flex items-center gap-2 text-xs text-gray-500'>
+                            <div className='subscription-plans__benefit flex items-center gap-2 text-xs'>
                               <Badge dot type='tertiary' />
                               <span>{item.label}</span>
                             </div>
@@ -643,13 +671,13 @@ const SubscriptionPlansCard = ({
               })}
             </div>
           ) : (
-            <div className='text-center text-gray-400 text-sm py-4'>
+            <div className='subscription-plans__empty text-center text-sm py-4'>
               {t('暂无可购买套餐')}
             </div>
           )}
         </Space>
       )}
-    </>
+    </div>
   );
 
   return (

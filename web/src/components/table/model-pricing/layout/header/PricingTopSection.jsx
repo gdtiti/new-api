@@ -31,6 +31,7 @@ const PricingTopSection = memo(
     handleCompositionEnd,
     isMobile,
     sidebarProps,
+    compactHeader,
     filterVendor,
     models,
     filteredModels,
@@ -40,7 +41,6 @@ const PricingTopSection = memo(
     setShowWithRecharge,
     currency,
     setCurrency,
-    siteDisplayType,
     showRatio,
     setShowRatio,
     viewMode,
@@ -53,7 +53,7 @@ const PricingTopSection = memo(
 
     return (
       <>
-        {isMobile ? (
+        {isMobile || compactHeader ? (
           <>
             <div className='w-full'>
               <SearchActions
@@ -69,7 +69,6 @@ const PricingTopSection = memo(
                 setShowWithRecharge={setShowWithRecharge}
                 currency={currency}
                 setCurrency={setCurrency}
-                siteDisplayType={siteDisplayType}
                 showRatio={showRatio}
                 setShowRatio={setShowRatio}
                 viewMode={viewMode}
@@ -105,7 +104,6 @@ const PricingTopSection = memo(
             setShowWithRecharge={setShowWithRecharge}
             currency={currency}
             setCurrency={setCurrency}
-            siteDisplayType={siteDisplayType}
             showRatio={showRatio}
             setShowRatio={setShowRatio}
             viewMode={viewMode}

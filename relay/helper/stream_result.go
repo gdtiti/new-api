@@ -27,10 +27,15 @@ func (r *StreamResult) Error(err error) {
 
 // Stop records a fatal error and marks the stream to stop after this chunk.
 func (r *StreamResult) Stop(err error) {
+	r.StopWithReason(relaycommon.StreamEndReasonHandlerStop, err)
+}
+
+// StopWithReason records a fatal error with an explicit end reason.
+func (r *StreamResult) StopWithReason(reason relaycommon.StreamEndReason, err error) {
 	if err != nil {
 		r.status.RecordError(err.Error())
 	}
-	r.status.SetEndReason(relaycommon.StreamEndReasonHandlerStop, err)
+	r.status.SetEndReason(reason, err)
 	r.stopped = true
 }
 

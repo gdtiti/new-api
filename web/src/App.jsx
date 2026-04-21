@@ -18,7 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { lazy, Suspense, useContext, useMemo } from 'react';
-import { Route, Routes, useLocation, useParams } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from 'react-router-dom';
 import Loading from './components/common/ui/Loading';
 import User from './pages/User';
 import { AuthRedirect, PrivateRoute, AdminRoute } from './helpers';
@@ -45,6 +51,8 @@ import ModelPage from './pages/Model';
 import ModelDeploymentPage from './pages/ModelDeployment';
 import Playground from './pages/Playground';
 import Subscription from './pages/Subscription';
+import ConsoleAnalyticsChannel from './pages/ConsoleAnalyticsChannel';
+import ConsoleAnalyticsModel from './pages/ConsoleAnalyticsModel';
 import OAuth2Callback from './components/auth/OAuth2Callback';
 import PersonalSetting from './components/settings/PersonalSetting';
 import Setup from './pages/Setup';
@@ -55,6 +63,29 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const About = lazy(() => import('./pages/About'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const PortalShell = lazy(() => import('./components/portal/PortalShell'));
+const PortalOverviewPage = lazy(
+  () => import('./components/portal/PortalOverviewPage'),
+);
+const PortalAnalyticsPage = lazy(
+  () => import('./components/portal/PortalAnalyticsPage'),
+);
+const PortalWalletPage = lazy(
+  () => import('./components/portal/PortalWalletPage'),
+);
+const PortalSubscriptionPage = lazy(
+  () => import('./components/portal/PortalSubscriptionPage'),
+);
+const PortalLogsPage = lazy(() => import('./components/portal/PortalLogsPage'));
+const PortalModelGalleryPage = lazy(
+  () => import('./components/portal/PortalModelGalleryPage'),
+);
+const PortalTokensPage = lazy(
+  () => import('./components/portal/PortalTokensPage'),
+);
+const PortalAccountPage = lazy(
+  () => import('./components/portal/PortalAccountPage'),
+);
 
 function DynamicOAuth2Callback() {
   const { provider } = useParams();
@@ -136,6 +167,22 @@ function App() {
           element={
             <AdminRoute>
               <Channel />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/analytics/channel'
+          element={
+            <AdminRoute>
+              <ConsoleAnalyticsChannel />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path='/console/analytics/model'
+          element={
+            <AdminRoute>
+              <ConsoleAnalyticsModel />
             </AdminRoute>
           }
         />
@@ -267,6 +314,82 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path='/app'
+          element={
+            <PrivateRoute>
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalShell />
+              </Suspense>
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to='overview' replace />} />
+          <Route
+            path='overview'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalOverviewPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='analytics'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalAnalyticsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='wallet'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalWalletPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='subscription'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalSubscriptionPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='tokens'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalTokensPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='logs'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalLogsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='models'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalModelGalleryPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path='account'
+            element={
+              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                <PortalAccountPage />
+              </Suspense>
+            }
+          />
+        </Route>
         <Route
           path='/console/topup'
           element={

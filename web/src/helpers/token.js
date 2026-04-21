@@ -59,12 +59,7 @@ export async function fetchTokenKeys() {
 
     const tokenItems = Array.isArray(data) ? data : data.items || [];
     const activeTokens = tokenItems.filter((token) => token.status === 1);
-    const keyResults = await Promise.allSettled(
-      activeTokens.map((token) => fetchTokenKey(token.id)),
-    );
-    return keyResults
-      .filter((result) => result.status === 'fulfilled' && result.value)
-      .map((result) => result.value);
+    return activeTokens.map((token) => token.key);
   } catch (error) {
     console.error('Error fetching token keys:', error);
     return [];

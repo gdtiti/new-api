@@ -33,6 +33,7 @@ import { Nav, Divider, Button } from '@douyinfe/semi-ui';
 const routerMap = {
   home: '/',
   channel: '/console/channel',
+  channel_analytics: '/console/analytics/channel',
   token: '/console/token',
   redemption: '/console/redemption',
   topup: '/console/topup',
@@ -46,6 +47,7 @@ const routerMap = {
   pricing: '/pricing',
   task: '/console/task',
   models: '/console/models',
+  model_analytics: '/console/analytics/model',
   deployment: '/console/deployment',
   playground: '/console/playground',
   personal: '/console/personal',
@@ -154,6 +156,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {
+        text: t('渠道分析'),
+        itemKey: 'channel_analytics',
+        to: '/console/analytics/channel',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
         text: t('订阅管理'),
         itemKey: 'subscription',
         to: '/subscription',
@@ -163,6 +171,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('模型管理'),
         itemKey: 'models',
         to: '/console/models',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('模型分析'),
+        itemKey: 'model_analytics',
+        to: '/console/analytics/model',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {
