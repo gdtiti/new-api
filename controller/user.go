@@ -841,10 +841,11 @@ func CreateUser(c *gin.Context) {
 }
 
 type ManageRequest struct {
-	Id     int    `json:"id"`
-	Action string `json:"action"`
-	Value  int    `json:"value"`
-	Mode   string `json:"mode"`
+	Id       int    `json:"id"`
+	Action   string `json:"action"`
+	Value    int    `json:"value"`
+	Mode     string `json:"mode"`
+	ExpireAt int64  `json:"expire_at"`
 }
 
 // ManageUser Only admin user can do this
@@ -929,7 +930,11 @@ func ManageUser(c *gin.Context) {
 				common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
 				return
 			}
-			if err := model.IncreaseUserQuota(user.Id, req.Value, true); err != nil {
+			if req.ExpireAt > 0 && req.ExpireAt <= common.GetTimestamp() {
+				common.ApiErrorMsg(c, "临时额度到期时间必须晚于当前时间")
+				return
+			}
+			if err := model.GrantUserQuota(user.Id, req.Value, req.ExpireAt, model.UserQuotaGrantSourceAdmin, adminName); err != nil {
 				common.ApiError(c, err)
 				return
 			}
@@ -948,7 +953,7 @@ func ManageUser(c *gin.Context) {
 				fmt.Sprintf("管理员减少用户额度 %s", logger.LogQuota(req.Value)), adminInfo)
 		case "override":
 			oldQuota := user.Quota
-			if err := model.DB.Model(&model.User{}).Where("id = ?", user.Id).Update("quota", req.Value).Error; err != nil {
+			if err := model.ReplaceUserQuota(user.Id, req.Value, model.UserQuotaGrantSourceAdminReplace, adminName); err != nil {
 				common.ApiError(c, err)
 				return
 			}
@@ -1093,7 +1098,7 @@ func TopUp(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	quota, err := model.Redeem(req.Key, id)
+	result, err := model.Redeem(req.Key, id)
 	if err != nil {
 		if errors.Is(err, model.ErrRedeemFailed) {
 			common.ApiErrorI18n(c, i18n.MsgRedeemFailed)
@@ -1105,7 +1110,7 @@ func TopUp(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    quota,
+		"data":    result,
 	})
 }
 

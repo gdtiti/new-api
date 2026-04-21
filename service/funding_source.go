@@ -27,8 +27,9 @@ type FundingSource interface {
 // ---------------------------------------------------------------------------
 
 type WalletFunding struct {
-	userId   int
-	consumed int // 实际预扣的用户额度
+	userId      int
+	consumed    int
+	allocations []model.UserQuotaAllocation
 }
 
 func (w *WalletFunding) Source() string { return BillingSourceWallet }
@@ -37,9 +38,11 @@ func (w *WalletFunding) PreConsume(amount int) error {
 	if amount <= 0 {
 		return nil
 	}
-	if err := model.DecreaseUserQuota(w.userId, amount, false); err != nil {
+	allocations, err := model.ConsumeUserQuota(w.userId, amount)
+	if err != nil {
 		return err
 	}
+	w.allocations = append(w.allocations, allocations...)
 	w.consumed = amount
 	return nil
 }
@@ -49,18 +52,66 @@ func (w *WalletFunding) Settle(delta int) error {
 		return nil
 	}
 	if delta > 0 {
-		return model.DecreaseUserQuota(w.userId, delta, false)
+		allocations, err := model.ConsumeUserQuota(w.userId, delta)
+		if err != nil {
+			return err
+		}
+		w.allocations = append(w.allocations, allocations...)
+		w.consumed += delta
+		return nil
 	}
-	return model.IncreaseUserQuota(w.userId, -delta, false)
+	refundAmount := -delta
+	if refundAmount > w.consumed {
+		refundAmount = w.consumed
+	}
+	if refundAmount <= 0 {
+		return nil
+	}
+	restore := popWalletRestoreAllocations(&w.allocations, refundAmount)
+	restored, err := model.RestoreUserQuotaAllocations(w.userId, restore)
+	if err != nil {
+		return err
+	}
+	w.consumed -= restored
+	return nil
 }
 
 func (w *WalletFunding) Refund() error {
 	if w.consumed <= 0 {
 		return nil
 	}
-	// IncreaseUserQuota 是 quota += N 的非幂等操作，不能重试，否则会多退额度。
-	// 订阅的 RefundSubscriptionPreConsume 有 requestId 幂等保护所以可以重试。
-	return model.IncreaseUserQuota(w.userId, w.consumed, false)
+	_, err := model.RestoreUserQuotaAllocations(w.userId, w.allocations)
+	return err
+}
+
+func popWalletRestoreAllocations(allocations *[]model.UserQuotaAllocation, amount int) []model.UserQuotaAllocation {
+	if allocations == nil || amount <= 0 {
+		return []model.UserQuotaAllocation{}
+	}
+	source := *allocations
+	result := make([]model.UserQuotaAllocation, 0, len(source))
+	remain := amount
+	for i := len(source) - 1; i >= 0 && remain > 0; i-- {
+		allocation := source[i]
+		if allocation.Amount <= 0 {
+			continue
+		}
+		restore := allocation.Amount
+		if restore > remain {
+			restore = remain
+			source[i].Amount -= restore
+		} else {
+			source = append(source[:i], source[i+1:]...)
+		}
+		result = append(result, model.UserQuotaAllocation{
+			GrantId:  allocation.GrantId,
+			Amount:   restore,
+			ExpireAt: allocation.ExpireAt,
+		})
+		remain -= restore
+	}
+	*allocations = source
+	return result
 }
 
 // ---------------------------------------------------------------------------

@@ -147,32 +147,39 @@ const TopUp = () => {
     return getAmount(value);
   };
 
-  const topUp = async () => {
-    if (redemptionCode === '') {
-      showInfo(t('请输入兑换码！'));
-      return;
-    }
+	  const topUp = async () => {
+	    if (redemptionCode === '') {
+	      showInfo(t('请输入兑换码！'));
+	      return;
+	    }
     setIsSubmitting(true);
     try {
-      const res = await API.post('/api/user/topup', {
-        key: redemptionCode,
-      });
-      const { success, message, data } = res.data;
-      if (success) {
-        showSuccess(t('兑换成功！'));
-        Modal.success({
-          title: t('兑换成功！'),
-          content: t('成功兑换额度：') + renderQuota(data),
-          centered: true,
-        });
-        if (userState.user) {
-          const updatedUser = {
-            ...userState.user,
-            quota: userState.user.quota + data,
-          };
-          userDispatch({ type: 'login', payload: updatedUser });
-        }
-        setRedemptionCode('');
+	      const res = await API.post('/api/user/topup', {
+	        key: redemptionCode,
+	      });
+	      const { success, message, data } = res.data;
+	      if (success) {
+	        const rewardType = data?.reward_type || 'quota';
+	        const walletQuotaDelta = Number(
+	          data?.wallet_quota_delta ?? data?.quota ?? 0,
+	        );
+	        showSuccess(t('兑换成功！'));
+	        Modal.success({
+	          title: t('兑换成功！'),
+	          content:
+	            rewardType === 'subscription'
+	              ? data?.display_message || t('订阅兑换成功')
+	              : t('成功兑换额度：') + renderQuota(walletQuotaDelta),
+	          centered: true,
+	        });
+	        if (userState.user && walletQuotaDelta > 0) {
+	          const updatedUser = {
+	            ...userState.user,
+	            quota: userState.user.quota + walletQuotaDelta,
+	          };
+	          userDispatch({ type: 'login', payload: updatedUser });
+	        }
+	        setRedemptionCode('');
       } else {
         showError(message);
       }

@@ -1,7 +1,9 @@
 package model
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -143,6 +145,21 @@ func cacheDecrUserQuota(userId int, delta int64) error {
 	return cacheIncrUserQuota(userId, -delta)
 }
 
+func getUserQuotaNextExpireAtCache(userId int) (int64, error) {
+	if !common.RedisEnabled || common.RDB == nil {
+		return 0, fmt.Errorf("redis is not enabled")
+	}
+	value, err := common.RDB.HGet(context.Background(), getUserCacheKey(userId), "QuotaNextExpireAt").Result()
+	if err != nil {
+		return 0, err
+	}
+	nextExpireAt, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return nextExpireAt, nil
+}
+
 // Helper functions to get individual fields if needed
 func getUserGroupCache(userId int) (string, error) {
 	cache, err := GetUserCache(userId)
@@ -201,6 +218,24 @@ func updateUserQuotaCache(userId int, quota int) error {
 		return nil
 	}
 	return common.RedisHSetField(getUserCacheKey(userId), "Quota", fmt.Sprintf("%d", quota))
+}
+
+func updateUserQuotaNextExpireAtCache(userId int, nextExpireAt int64) error {
+	if !common.RedisEnabled {
+		return nil
+	}
+	return common.RedisHSetField(getUserCacheKey(userId), "QuotaNextExpireAt", fmt.Sprintf("%d", nextExpireAt))
+}
+
+func syncUserQuotaCacheState(userId int, quota int, nextExpireAt int64) {
+	gopool.Go(func() {
+		if err := updateUserQuotaCache(userId, quota); err != nil {
+			common.SysLog("failed to update user quota cache: " + err.Error())
+		}
+		if err := updateUserQuotaNextExpireAtCache(userId, nextExpireAt); err != nil {
+			common.SysLog("failed to update user quota next expire cache: " + err.Error())
+		}
+	})
 }
 
 func updateUserGroupCache(userId int, group string) error {

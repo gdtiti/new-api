@@ -81,6 +81,21 @@ func AddRedemption(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 		return
 	}
+	redemption.RewardType = model.NormalizeRedemptionRewardType(redemption.RewardType)
+	if redemption.RewardType == model.RedemptionRewardTypeSubscription {
+		if redemption.PlanId <= 0 {
+			common.ApiErrorMsg(c, "请选择订阅套餐")
+			return
+		}
+		if _, err := model.GetSubscriptionPlanById(redemption.PlanId); err != nil {
+			common.ApiErrorMsg(c, "订阅套餐不存在")
+			return
+		}
+		redemption.Quota = 0
+	} else if redemption.Quota <= 0 {
+		common.ApiErrorMsg(c, "请输入额度")
+		return
+	}
 	var keys []string
 	for i := 0; i < redemption.Count; i++ {
 		key := common.GetUUID()
@@ -88,8 +103,10 @@ func AddRedemption(c *gin.Context) {
 			UserId:      c.GetInt("id"),
 			Name:        redemption.Name,
 			Key:         key,
+			RewardType:  redemption.RewardType,
 			CreatedTime: common.GetTimestamp(),
 			Quota:       redemption.Quota,
+			PlanId:      redemption.PlanId,
 			ExpiredTime: redemption.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
@@ -144,9 +161,26 @@ func UpdateRedemption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 			return
 		}
+		redemption.RewardType = model.NormalizeRedemptionRewardType(redemption.RewardType)
+		if redemption.RewardType == model.RedemptionRewardTypeSubscription {
+			if redemption.PlanId <= 0 {
+				common.ApiErrorMsg(c, "请选择订阅套餐")
+				return
+			}
+			if _, err := model.GetSubscriptionPlanById(redemption.PlanId); err != nil {
+				common.ApiErrorMsg(c, "订阅套餐不存在")
+				return
+			}
+			redemption.Quota = 0
+		} else if redemption.Quota <= 0 {
+			common.ApiErrorMsg(c, "请输入额度")
+			return
+		}
 		// If you add more fields, please also update redemption.Update()
 		cleanRedemption.Name = redemption.Name
+		cleanRedemption.RewardType = redemption.RewardType
 		cleanRedemption.Quota = redemption.Quota
+		cleanRedemption.PlanId = redemption.PlanId
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
 	}
 	if statusOnly != "" {

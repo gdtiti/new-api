@@ -17,10 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Empty,
+  Form,
   Modal,
   Select,
   SideSheet,
@@ -52,6 +53,13 @@ function renderStatusTag(sub, t) {
 
   const isExpiredByTime = end > 0 && end < now;
   const isActive = status === 'active' && !isExpiredByTime;
+  if (status === 'queued' && !isExpiredByTime) {
+    return (
+      <Tag color='orange' shape='circle' size='small'>
+        {t('排队中')}
+      </Tag>
+    );
+  }
   if (isActive) {
     return (
       <Tag color='green' shape='circle' size='small'>
@@ -81,10 +89,14 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
 
   const [plans, setPlans] = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState(null);
+  const [timeModalVisible, setTimeModalVisible] = useState(false);
+  const [updatingTime, setUpdatingTime] = useState(false);
+  const [editingTimeSub, setEditingTimeSub] = useState(null);
 
   const [subs, setSubs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const timeFormApiRef = useRef(null);
 
   const planTitleMap = useMemo(() => {
     const map = new Map();
@@ -156,6 +168,18 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
     loadPlans();
     loadUserSubscriptions();
   }, [visible]);
+
+  useEffect(() => {
+    if (!timeModalVisible || !editingTimeSub || !timeFormApiRef.current) return;
+    timeFormApiRef.current.setValues({
+      start_time: editingTimeSub?.start_time
+        ? new Date(editingTimeSub.start_time * 1000)
+        : null,
+      end_time: editingTimeSub?.end_time
+        ? new Date(editingTimeSub.end_time * 1000)
+        : null,
+    });
+  }, [timeModalVisible, editingTimeSub]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -245,6 +269,57 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
     });
   };
 
+  const openTimeModal = (sub) => {
+    setEditingTimeSub(sub);
+    setTimeModalVisible(true);
+  };
+
+  const closeTimeModal = () => {
+    setTimeModalVisible(false);
+    setEditingTimeSub(null);
+    timeFormApiRef.current?.reset();
+  };
+
+  const submitSubscriptionTime = async (values) => {
+    if (!editingTimeSub?.id) {
+      showError(t('订阅信息缺失'));
+      return;
+    }
+    const startTime = values?.start_time
+      ? Math.floor(values.start_time.getTime() / 1000)
+      : 0;
+    const endTime = values?.end_time
+      ? Math.floor(values.end_time.getTime() / 1000)
+      : 0;
+    if (!startTime || !endTime || endTime <= startTime) {
+      showError(t('请输入有效的开始和结束时间'));
+      return;
+    }
+    setUpdatingTime(true);
+    try {
+      const res = await API.patch(
+        `/api/subscription/admin/user_subscriptions/${editingTimeSub.id}/time`,
+        {
+          start_time: startTime,
+          end_time: endTime,
+        },
+      );
+      if (res.data?.success) {
+        const msg = res.data?.data?.message;
+        showSuccess(msg ? msg : t('更新时间成功'));
+        closeTimeModal();
+        await loadUserSubscriptions();
+        onSuccess?.();
+      } else {
+        showError(res.data?.message || t('更新时间失败'));
+      }
+    } catch (e) {
+      showError(t('请求失败'));
+    } finally {
+      setUpdatingTime(false);
+    }
+  };
+
   const columns = useMemo(() => {
     return [
       {
@@ -314,7 +389,7 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
       {
         title: '',
         key: 'operate',
-        width: 140,
+        width: 240,
         fixed: 'right',
         render: (_, record) => {
           const sub = record?.subscription;
@@ -325,6 +400,14 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
           const isCancelled = sub?.status === 'cancelled';
           return (
             <Space>
+              <Button
+                size='small'
+                theme='light'
+                disabled={isCancelled}
+                onClick={() => openTimeModal(sub)}
+              >
+                {t('改时间')}
+              </Button>
               <Button
                 size='small'
                 type='warning'
@@ -426,6 +509,35 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
           size='middle'
         />
       </div>
+      <Modal
+        centered
+        visible={timeModalVisible}
+        title={t('调整订阅有效期')}
+        onCancel={closeTimeModal}
+        onOk={() => timeFormApiRef.current?.submitForm()}
+        confirmLoading={updatingTime}
+      >
+        <Form
+          initValues={{ start_time: null, end_time: null }}
+          getFormApi={(api) => (timeFormApiRef.current = api)}
+          onSubmit={submitSubscriptionTime}
+        >
+          <Form.DatePicker
+            field='start_time'
+            label={t('开始时间')}
+            type='dateTime'
+            rules={[{ required: true, message: t('请选择开始时间') }]}
+            style={{ width: '100%' }}
+          />
+          <Form.DatePicker
+            field='end_time'
+            label={t('结束时间')}
+            type='dateTime'
+            rules={[{ required: true, message: t('请选择结束时间') }]}
+            style={{ width: '100%' }}
+          />
+        </Form>
+      </Modal>
     </SideSheet>
   );
 };
