@@ -446,7 +446,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 			common.SysError(fmt.Sprintf("record channel base_url failure failed: channel_id=%d, base_url_id=%d, err=%v", channelError.ChannelId, baseURLID, recordErr))
 		}
 	}
-	if service.ShouldDisableChannel(channelError.ChannelType, err) && channelError.AutoBan {
+	if service.ShouldDisableChannel(err) && channelError.AutoBan {
 		gopool.Go(func() {
 			service.DisableChannel(channelError, err.ErrorWithStatusCode())
 		})
