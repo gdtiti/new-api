@@ -64,6 +64,12 @@ const resetPeriodOptions = [
   { value: 'custom', label: '自定义(秒)' },
 ];
 
+const activationModeOptions = [
+  { value: 'concurrent', label: '可和其它套餐同时生效' },
+  { value: 'standalone', label: '可独立生效' },
+  { value: 'dependent', label: '只能和其它套餐一起生效' },
+];
+
 const AddEditSubscriptionModal = ({
   visible,
   handleClose,
@@ -88,15 +94,18 @@ const AddEditSubscriptionModal = ({
     duration_unit: 'month',
     duration_value: 1,
     custom_seconds: 0,
-    quota_reset_period: 'never',
-    quota_reset_custom_seconds: 0,
-    enabled: true,
-    sort_order: 0,
-    max_purchase_per_user: 0,
-    total_amount: 0,
-    upgrade_group: '',
-    stripe_price_id: '',
-    creem_product_id: '',
+	    quota_reset_period: 'never',
+	    quota_reset_custom_seconds: 0,
+	    enabled: true,
+	    sort_order: 0,
+	    max_purchase_per_user: 0,
+	    allow_stacking: true,
+	    allow_continuation: true,
+	    activation_mode: 'concurrent',
+	    total_amount: 0,
+	    upgrade_group: '',
+	    stripe_price_id: '',
+	    creem_product_id: '',
   });
 
   const buildFormValues = () => {
@@ -112,15 +121,18 @@ const AddEditSubscriptionModal = ({
       duration_unit: p.duration_unit || 'month',
       duration_value: Number(p.duration_value || 1),
       custom_seconds: Number(p.custom_seconds || 0),
-      quota_reset_period: p.quota_reset_period || 'never',
-      quota_reset_custom_seconds: Number(p.quota_reset_custom_seconds || 0),
-      enabled: p.enabled !== false,
-      sort_order: Number(p.sort_order || 0),
-      max_purchase_per_user: Number(p.max_purchase_per_user || 0),
-      total_amount: Number(
-        quotaToDisplayAmount(p.total_amount || 0).toFixed(2),
-      ),
-      upgrade_group: p.upgrade_group || '',
+	      quota_reset_period: p.quota_reset_period || 'never',
+	      quota_reset_custom_seconds: Number(p.quota_reset_custom_seconds || 0),
+	      enabled: p.enabled !== false,
+	      sort_order: Number(p.sort_order || 0),
+	      max_purchase_per_user: Number(p.max_purchase_per_user || 0),
+	      allow_stacking: p.allow_stacking !== false,
+	      allow_continuation: p.allow_continuation !== false,
+	      activation_mode: p.activation_mode || 'concurrent',
+	      total_amount: Number(
+	        quotaToDisplayAmount(p.total_amount || 0).toFixed(2),
+	      ),
+	      upgrade_group: p.upgrade_group || '',
       stripe_price_id: p.stripe_price_id || '',
       creem_product_id: p.creem_product_id || '',
     };
@@ -160,12 +172,15 @@ const AddEditSubscriptionModal = ({
             values.quota_reset_period === 'custom'
               ? Number(values.quota_reset_custom_seconds || 0)
               : 0,
-          sort_order: Number(values.sort_order || 0),
-          max_purchase_per_user: Number(values.max_purchase_per_user || 0),
-          total_amount: displayAmountToQuota(values.total_amount),
-          upgrade_group: values.upgrade_group || '',
-        },
-      };
+	          sort_order: Number(values.sort_order || 0),
+	          max_purchase_per_user: Number(values.max_purchase_per_user || 0),
+	          allow_stacking: values.allow_stacking !== false,
+	          allow_continuation: values.allow_continuation !== false,
+	          activation_mode: values.activation_mode || 'concurrent',
+	          total_amount: displayAmountToQuota(values.total_amount),
+	          upgrade_group: values.upgrade_group || '',
+	        },
+	      };
       if (editingPlan?.plan?.id) {
         const res = await API.put(
           `/api/subscription/admin/plans/${editingPlan.plan.id}`,
@@ -272,7 +287,7 @@ const AddEditSubscriptionModal = ({
                     </div>
                   </div>
 
-                  <Row gutter={12}>
+	                  <Row gutter={12}>
                     <Col span={24}>
                       <Form.Input
                         field='title'
@@ -378,11 +393,65 @@ const AddEditSubscriptionModal = ({
                         size='large'
                       />
                     </Col>
-                  </Row>
-                </Card>
+	                  </Row>
+	                </Card>
 
-                {/* 有效期设置 */}
-                <Card className='!rounded-2xl shadow-sm border-0 mb-4'>
+	                <Card className='!rounded-2xl shadow-sm border-0 mb-4'>
+	                  <div className='flex items-center mb-2'>
+	                    <Avatar
+	                      size='small'
+	                      color='indigo'
+	                      className='mr-2 shadow-md'
+	                    >
+	                      <IconCalendarClock size={16} />
+	                    </Avatar>
+	                    <div>
+	                      <Text className='text-lg font-medium'>
+	                        {t('生效规则')}
+	                      </Text>
+	                      <div className='text-xs text-gray-600'>
+	                        {t('控制套餐是否可叠加、可续接，以及和其它套餐的关系')}
+	                      </div>
+	                    </div>
+	                  </div>
+
+	                  <Row gutter={12}>
+	                    <Col span={12}>
+	                      <Form.Switch
+	                        field='allow_stacking'
+	                        label={t('可叠加')}
+	                        extraText={t('开启后允许和其它套餐同时存在')}
+	                        size='large'
+	                      />
+	                    </Col>
+	                    <Col span={12}>
+	                      <Form.Switch
+	                        field='allow_continuation'
+	                        label={t('可延续')}
+	                        extraText={t('开启后可自动顺延到上一份套餐之后生效')}
+	                        size='large'
+	                      />
+	                    </Col>
+	                    <Col span={24}>
+	                      <Form.Select
+	                        field='activation_mode'
+	                        label={t('生效模式')}
+	                        extraText={t(
+	                          '加量包可选“可和其它套餐同时生效”；独占套餐可选“可独立生效”；附属包可选“只能和其它套餐一起生效”。',
+	                        )}
+	                      >
+	                        {activationModeOptions.map((o) => (
+	                          <Select.Option key={o.value} value={o.value}>
+	                            {t(o.label)}
+	                          </Select.Option>
+	                        ))}
+	                      </Form.Select>
+	                    </Col>
+	                  </Row>
+	                </Card>
+
+	                {/* 有效期设置 */}
+	                <Card className='!rounded-2xl shadow-sm border-0 mb-4'>
                   <div className='flex items-center mb-2'>
                     <Avatar
                       size='small'

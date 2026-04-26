@@ -44,6 +44,7 @@ import {
   Avatar,
   Row,
   Col,
+  DatePicker,
   InputNumber,
   RadioGroup,
   Radio,
@@ -69,6 +70,7 @@ const EditUserModal = (props) => {
   const [adjustAmountLocal, setAdjustAmountLocal] = useState('');
   const [adjustMode, setAdjustMode] = useState('add');
   const [adjustLoading, setAdjustLoading] = useState(false);
+  const [adjustExpireAt, setAdjustExpireAt] = useState(null);
   const isMobile = useIsMobile();
   const [groupOptions, setGroupOptions] = useState([]);
   const [bindingModalVisible, setBindingModalVisible] = useState(false);
@@ -178,6 +180,10 @@ const EditUserModal = (props) => {
         action: 'add_quota',
         mode: adjustMode,
         value: adjustMode === 'override' ? quotaVal : Math.abs(quotaVal),
+        expire_at:
+          adjustMode === 'add' && adjustExpireAt
+            ? Math.floor(adjustExpireAt.getTime() / 1000)
+            : 0,
       });
       const { success, message } = res.data;
       if (success) {
@@ -185,6 +191,7 @@ const EditUserModal = (props) => {
         setAdjustModalOpen(false);
         setAdjustQuotaLocal('');
         setAdjustAmountLocal('');
+        setAdjustExpireAt(null);
         const userRes = await API.get(`/api/user/${userId}`);
         if (userRes.data.success) {
           const data = userRes.data.data;
@@ -461,16 +468,17 @@ const EditUserModal = (props) => {
       />
 
       {/* 调整额度模态框 */}
-      <Modal
-        centered
-        visible={adjustModalOpen}
-        onOk={adjustQuota}
-        onCancel={() => {
-          setAdjustModalOpen(false);
-          setAdjustQuotaLocal('');
-          setAdjustAmountLocal('');
-          setAdjustMode('add');
-        }}
+	      <Modal
+	        centered
+	        visible={adjustModalOpen}
+	        onOk={adjustQuota}
+	        onCancel={() => {
+	          setAdjustModalOpen(false);
+	          setAdjustQuotaLocal('');
+	          setAdjustAmountLocal('');
+	          setAdjustExpireAt(null);
+	          setAdjustMode('add');
+	        }}
         confirmLoading={adjustLoading}
         closable={null}
         title={
@@ -492,11 +500,12 @@ const EditUserModal = (props) => {
           <RadioGroup
             type='button'
             value={adjustMode}
-            onChange={(e) => {
-              setAdjustMode(e.target.value);
-              setAdjustQuotaLocal('');
-              setAdjustAmountLocal('');
-            }}
+	            onChange={(e) => {
+	              setAdjustMode(e.target.value);
+	              setAdjustQuotaLocal('');
+	              setAdjustAmountLocal('');
+	              setAdjustExpireAt(null);
+	            }}
             style={{ width: '100%' }}
           >
             <Radio value='add'>{t('添加')}</Radio>
@@ -504,10 +513,10 @@ const EditUserModal = (props) => {
             <Radio value='override'>{t('覆盖')}</Radio>
           </RadioGroup>
         </div>
-        <div className='mb-3'>
-          <div className='mb-1'>
-            <Text size='small'>{t('金额')}</Text>
-          </div>
+	        <div className='mb-3'>
+	          <div className='mb-1'>
+	            <Text size='small'>{t('金额')}</Text>
+	          </div>
           <InputNumber
             prefix={getCurrencyConfig().symbol}
             placeholder={t('输入金额')}
@@ -528,10 +537,25 @@ const EditUserModal = (props) => {
             }}
             style={{ width: '100%' }}
             showClear
-          />
-        </div>
-        <div
-          className='text-xs cursor-pointer mt-2'
+	          />
+	        </div>
+	        {adjustMode === 'add' && (
+	          <div className='mb-3'>
+	            <div className='mb-1'>
+	              <Text size='small'>{t('到期时间')}</Text>
+	            </div>
+	            <DatePicker
+	              type='dateTime'
+	              placeholder={t('留空表示永久额度')}
+	              value={adjustExpireAt}
+	              onChange={(val) => setAdjustExpireAt(val || null)}
+	              style={{ width: '100%' }}
+	              showClear
+	            />
+	          </div>
+	        )}
+	        <div
+	          className='text-xs cursor-pointer mt-2'
           style={{ color: 'var(--semi-color-text-2)' }}
           onClick={() => setShowAdjustQuotaRaw((v) => !v)}
         >

@@ -219,9 +219,14 @@ func Redeem(key string, userId int) (*RedeemResult, error) {
 			if redemption.Quota <= 0 {
 				return newRedeemBusinessError("兑换码额度无效")
 			}
-			if err := tx.Model(&User{}).
-				Where("id = ?", userId).
-				Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error; err != nil {
+			if _, _, err := grantUserQuotaTx(
+				tx,
+				userId,
+				redemption.Quota,
+				0,
+				UserQuotaGrantSourceRedemption,
+				fmt.Sprintf("redemption:%d", redemption.Id),
+			); err != nil {
 				return err
 			}
 			usage.QuotaDelta = redemption.Quota

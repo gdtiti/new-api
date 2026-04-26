@@ -207,7 +207,7 @@ const PaymentSetting = () => {
         }
       });
 
-      setInputs((prev) => ({ ...prev, ...newInputs }));
+      setInputs(newInputs);
     } else {
       showError(t(message));
     }
