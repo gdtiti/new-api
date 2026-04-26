@@ -53,6 +53,8 @@ type User struct {
 	TemporaryCreatedBy      int            `json:"temporary_created_by" gorm:"type:int;default:0;index"`
 	TemporaryDefaultTokenId int            `json:"temporary_default_token_id" gorm:"type:int;default:0"`
 	StripeCustomer          string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	CreatedAt               int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
+	LastLoginAt             int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -971,6 +973,12 @@ func DeltaUpdateUserQuota(id int, delta int) (err error) {
 func GetRootUser() (user *User) {
 	DB.Where("role = ?", common.RoleRootUser).First(&user)
 	return user
+}
+
+func UpdateUserLastLoginAt(id int) {
+	if err := DB.Model(&User{}).Where("id = ?", id).Update("last_login_at", common.GetTimestamp()).Error; err != nil {
+		common.SysLog("failed to update user last_login_at: " + err.Error())
+	}
 }
 
 func UpdateUserUsedQuotaAndRequestCount(id int, quota int) {

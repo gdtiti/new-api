@@ -2,6 +2,7 @@ package model_setting
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/setting/config"
 )
@@ -50,18 +51,20 @@ func GetClaudeSettings() *ClaudeSettings {
 func (c *ClaudeSettings) WriteHeaders(originModel string, httpHeader *http.Header) {
 	if headers, ok := c.HeadersSettings[originModel]; ok {
 		for headerKey, headerValues := range headers {
-			// get existing values for this header key
-			existingValues := httpHeader.Values(headerKey)
-			existingValuesMap := make(map[string]bool)
-			for _, v := range existingValues {
-				existingValuesMap[v] = true
-			}
-
-			// add only values that don't already exist
-			for _, headerValue := range headerValues {
-				if !existingValuesMap[headerValue] {
-					httpHeader.Add(headerKey, headerValue)
+			seenValues := make(map[string]bool)
+			mergedValues := make([]string, 0, len(headerValues))
+			for _, headerValue := range append(httpHeader.Values(headerKey), headerValues...) {
+				for _, value := range strings.Split(headerValue, ",") {
+					value = strings.TrimSpace(value)
+					if value == "" || seenValues[value] {
+						continue
+					}
+					seenValues[value] = true
+					mergedValues = append(mergedValues, value)
 				}
+			}
+			if len(mergedValues) > 0 {
+				httpHeader.Set(headerKey, strings.Join(mergedValues, ","))
 			}
 		}
 	}

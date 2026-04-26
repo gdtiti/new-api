@@ -17,9 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
 import { Modal } from '@douyinfe/semi-ui';
 import {
   API,
@@ -28,7 +27,6 @@ import {
   showError,
   showSuccess,
   timestamp2string,
-  toLocalUnixTimestamp,
   renderQuota,
   renderNumber,
   getLogOther,
@@ -38,6 +36,7 @@ import {
   renderAudioModelPrice,
   renderClaudeModelPrice,
   renderModelPrice,
+  renderTieredModelPrice,
   renderTaskBillingProcess,
 } from '../../helpers';
 import { ITEMS_PER_PAGE } from '../../constants';
@@ -46,8 +45,6 @@ import ParamOverrideEntry from '../../components/table/usage-logs/components/Par
 
 export const useLogsData = () => {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
-  const appliedSearchRef = useRef('');
 
   // Define column keys for selection
   const COLUMN_KEYS = {
@@ -84,8 +81,9 @@ export const useLogsData = () => {
   const STORAGE_KEY = isAdminUser
     ? 'logs-table-columns-admin'
     : 'logs-table-columns-user';
-  const NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY =
-    'logs-table-columns-user-channel-visible-v1';
+  const BILLING_DISPLAY_MODE_STORAGE_KEY = isAdminUser
+    ? 'logs-billing-display-mode-admin'
+    : 'logs-billing-display-mode-user';
 
   // Statistics state
   const [stat, setStat] = useState({
@@ -95,29 +93,84 @@ export const useLogsData = () => {
 
   // Form state
   const [formApi, setFormApi] = useState(null);
-  const formInitValues = useMemo(() => {
-    const startTimestamp =
-      searchParams.get('start_timestamp') ||
-      timestamp2string(getTodayStartTimestamp());
-    const endTimestamp =
-      searchParams.get('end_timestamp') ||
-      timestamp2string(Math.floor(Date.now() / 1000) + 3600);
+  let now = new Date();
+  const formInitValues = {
+    username: '',
+    token_name: '',
+    model_name: '',
+    channel: '',
+    group: '',
+    request_id: '',
+    dateRange: [
+      timestamp2string(getTodayStartTimestamp()),
+      timestamp2string(now.getTime() / 1000 + 3600),
+    ],
+    logType: '0',
+  };
 
+  // Get default column visibility based on user role
+  const getDefaultColumnVisibility = () => {
     return {
-      username: '',
-      token_name: searchParams.get('token_name') || '',
-      model_name: searchParams.get('model_name') || '',
-      channel: '',
-      group: searchParams.get('group') || '',
-      request_id: searchParams.get('request_id') || '',
-      dateRange: [startTimestamp, endTimestamp],
-      logType: searchParams.get('logType') || '0',
+      [COLUMN_KEYS.TIME]: true,
+      [COLUMN_KEYS.CHANNEL]: isAdminUser,
+      [COLUMN_KEYS.USERNAME]: isAdminUser,
+      [COLUMN_KEYS.TOKEN]: true,
+      [COLUMN_KEYS.GROUP]: true,
+      [COLUMN_KEYS.TYPE]: true,
+      [COLUMN_KEYS.MODEL]: true,
+      [COLUMN_KEYS.USE_TIME]: true,
+      [COLUMN_KEYS.PROMPT]: true,
+      [COLUMN_KEYS.COMPLETION]: true,
+      [COLUMN_KEYS.COST]: true,
+      [COLUMN_KEYS.RETRY]: isAdminUser,
+      [COLUMN_KEYS.IP]: true,
+      [COLUMN_KEYS.DETAILS]: true,
     };
-  }, [searchParams]);
+  };
+
+  const getInitialVisibleColumns = () => {
+    const defaults = getDefaultColumnVisibility();
+    const savedColumns = localStorage.getItem(STORAGE_KEY);
+
+    if (!savedColumns) {
+      return defaults;
+    }
+
+    try {
+      const parsed = JSON.parse(savedColumns);
+      const merged = { ...defaults, ...parsed };
+
+      if (!isAdminUser) {
+        merged[COLUMN_KEYS.CHANNEL] = false;
+        merged[COLUMN_KEYS.USERNAME] = false;
+        merged[COLUMN_KEYS.RETRY] = false;
+      }
+
+      return merged;
+    } catch (e) {
+      console.error('Failed to parse saved column preferences', e);
+      return defaults;
+    }
+  };
+
+  const getInitialBillingDisplayMode = () => {
+    const savedMode = localStorage.getItem(BILLING_DISPLAY_MODE_STORAGE_KEY);
+    if (savedMode === 'price' || savedMode === 'ratio') {
+      return savedMode;
+    }
+    return localStorage.getItem('quota_display_type') === 'TOKENS'
+      ? 'ratio'
+      : 'price';
+  };
 
   // Column visibility state
-  const [visibleColumns, setVisibleColumns] = useState({});
+  const [visibleColumns, setVisibleColumns] = useState(
+    getInitialVisibleColumns,
+  );
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [billingDisplayMode, setBillingDisplayMode] = useState(
+    getInitialBillingDisplayMode,
+  );
 
   // Compact mode
   const [compactMode, setCompactMode] = useTableCompactMode('logs');
@@ -135,59 +188,6 @@ export const useLogsData = () => {
     useState(null);
   const [showParamOverrideModal, setShowParamOverrideModal] = useState(false);
   const [paramOverrideTarget, setParamOverrideTarget] = useState(null);
-
-  // Load saved column preferences from localStorage
-  useEffect(() => {
-    const savedColumns = localStorage.getItem(STORAGE_KEY);
-    if (savedColumns) {
-      try {
-        const parsed = JSON.parse(savedColumns);
-        const defaults = getDefaultColumnVisibility();
-        const merged = { ...defaults, ...parsed };
-
-        // For non-admin users, force-hide sensitive columns (does not touch admin settings)
-        if (!isAdminUser) {
-          merged[COLUMN_KEYS.USERNAME] = false;
-          merged[COLUMN_KEYS.RETRY] = false;
-
-          // Historical migration: channel column used to be forcibly hidden for non-admin users.
-          // Make it visible once by default, while still allowing users to hide it afterwards.
-          const migrated =
-            localStorage.getItem(NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY) === 'true';
-          if (!migrated) {
-            merged[COLUMN_KEYS.CHANNEL] = true;
-            localStorage.setItem(NON_ADMIN_CHANNEL_COLUMN_MIGRATION_KEY, 'true');
-          }
-        }
-        setVisibleColumns(merged);
-      } catch (e) {
-        console.error('Failed to parse saved column preferences', e);
-        initDefaultColumns();
-      }
-    } else {
-      initDefaultColumns();
-    }
-  }, []);
-
-  // Get default column visibility based on user role
-  const getDefaultColumnVisibility = () => {
-    return {
-      [COLUMN_KEYS.TIME]: true,
-      [COLUMN_KEYS.CHANNEL]: true,
-      [COLUMN_KEYS.USERNAME]: isAdminUser,
-      [COLUMN_KEYS.TOKEN]: true,
-      [COLUMN_KEYS.GROUP]: true,
-      [COLUMN_KEYS.TYPE]: true,
-      [COLUMN_KEYS.MODEL]: true,
-      [COLUMN_KEYS.USE_TIME]: true,
-      [COLUMN_KEYS.PROMPT]: true,
-      [COLUMN_KEYS.COMPLETION]: true,
-      [COLUMN_KEYS.COST]: true,
-      [COLUMN_KEYS.RETRY]: isAdminUser,
-      [COLUMN_KEYS.IP]: true,
-      [COLUMN_KEYS.DETAILS]: true,
-    };
-  };
 
   // Initialize default column visibility
   const initDefaultColumns = () => {
@@ -209,7 +209,9 @@ export const useLogsData = () => {
 
     allKeys.forEach((key) => {
       if (
-        (key === COLUMN_KEYS.USERNAME || key === COLUMN_KEYS.RETRY) &&
+        (key === COLUMN_KEYS.CHANNEL ||
+          key === COLUMN_KEYS.USERNAME ||
+          key === COLUMN_KEYS.RETRY) &&
         !isAdminUser
       ) {
         updatedColumns[key] = false;
@@ -228,12 +230,16 @@ export const useLogsData = () => {
     }
   }, [visibleColumns]);
 
+  useEffect(() => {
+    localStorage.setItem(BILLING_DISPLAY_MODE_STORAGE_KEY, billingDisplayMode);
+  }, [BILLING_DISPLAY_MODE_STORAGE_KEY, billingDisplayMode]);
+
   // 获取表单值的辅助函数，确保所有值都是字符串
   const getFormValues = () => {
-    const formValues = formApi ? formApi.getValues() : formInitValues;
+    const formValues = formApi ? formApi.getValues() : {};
 
-    let start_timestamp = formInitValues.dateRange[0];
-    let end_timestamp = formInitValues.dateRange[1];
+    let start_timestamp = timestamp2string(getTodayStartTimestamp());
+    let end_timestamp = timestamp2string(now.getTime() / 1000 + 3600);
 
     if (
       formValues.dateRange &&
@@ -268,8 +274,8 @@ export const useLogsData = () => {
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
-    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
-    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
+    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
+    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
     let url = `/api/log/self/stat?type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}`;
     url = encodeURI(url);
     let res = await API.get(url);
@@ -293,8 +299,8 @@ export const useLogsData = () => {
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
-    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
-    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
+    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
+    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
     let url = `/api/log/stat?type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}`;
     url = encodeURI(url);
     let res = await API.get(url);
@@ -379,7 +385,10 @@ export const useLogsData = () => {
       let other = getLogOther(logs[i].other);
       let expandDataLocal = [];
 
-      if (isAdminUser && (logs[i].type === 0 || logs[i].type === 2 || logs[i].type === 6)) {
+      if (
+        isAdminUser &&
+        (logs[i].type === 0 || logs[i].type === 2 || logs[i].type === 6)
+      ) {
         expandDataLocal.push({
           key: t('渠道信息'),
           value: `${logs[i].channel} - ${logs[i].channel_name || '[未知]'}`,
@@ -422,41 +431,17 @@ export const useLogsData = () => {
         });
       }
       if (logs[i].type === 2) {
-        expandDataLocal.push({
-          key: t('日志详情'),
-          value: other?.claude
-            ? renderClaudeLogContent(
-                other?.model_ratio,
-                other.completion_ratio,
-                other.model_price,
-                other.group_ratio,
-                other?.user_group_ratio,
-                other.cache_ratio || 1.0,
-                other.cache_creation_ratio || 1.0,
-                other.cache_creation_tokens_5m || 0,
-                other.cache_creation_ratio_5m ||
-                  other.cache_creation_ratio ||
-                  1.0,
-                other.cache_creation_tokens_1h || 0,
-                other.cache_creation_ratio_1h ||
-                  other.cache_creation_ratio ||
-                  1.0,
-              )
-            : renderLogContent(
-                other?.model_ratio,
-                other.completion_ratio,
-                other.model_price,
-                other.group_ratio,
-                other?.user_group_ratio,
-                other.cache_ratio || 1.0,
-                false,
-                1.0,
-                other.web_search || false,
-                other.web_search_call_count || 0,
-                other.file_search || false,
-                other.file_search_call_count || 0,
-              ),
-        });
+        if (other?.billing_mode !== 'tiered_expr') {
+          expandDataLocal.push({
+            key: t('日志详情'),
+            value: other?.claude
+              ? renderClaudeLogContent({
+                  ...other,
+                  displayMode: billingDisplayMode,
+                })
+              : renderLogContent({ ...other, displayMode: billingDisplayMode }),
+          });
+        }
         if (logs[i]?.content) {
           expandDataLocal.push({
             key: t('其他详情'),
@@ -492,74 +477,22 @@ export const useLogsData = () => {
           Boolean(other?.violation_fee_marker);
 
         let content = '';
-        if (!isViolationFeeLog) {
+        if (!isViolationFeeLog && other?.billing_mode !== 'tiered_expr') {
+          const logOpts = {
+            ...other,
+            prompt_tokens: logs[i].prompt_tokens,
+            completion_tokens: logs[i].completion_tokens,
+            displayMode: billingDisplayMode,
+          };
           const isTaskLog = other?.is_task === true || other?.task_id != null;
           if (isTaskLog && other?.model_price === -1) {
             content = renderTaskBillingProcess(other, logs[i].content);
           } else if (other?.ws || other?.audio) {
-            content = renderAudioModelPrice(
-              other?.text_input,
-              other?.text_output,
-              other?.model_ratio,
-              other?.model_price,
-              other?.completion_ratio,
-              other?.audio_input,
-              other?.audio_output,
-              other?.audio_ratio,
-              other?.audio_completion_ratio,
-              other?.group_ratio,
-              other?.user_group_ratio,
-              other?.cache_tokens || 0,
-              other?.cache_ratio || 1.0,
-            );
+            content = renderAudioModelPrice(logOpts);
           } else if (other?.claude) {
-            content = renderClaudeModelPrice(
-              logs[i].prompt_tokens,
-              logs[i].completion_tokens,
-              other.model_ratio,
-              other.model_price,
-              other.completion_ratio,
-              other.group_ratio,
-              other?.user_group_ratio,
-              other.cache_tokens || 0,
-              other.cache_ratio || 1.0,
-              other.cache_creation_tokens || 0,
-              other.cache_creation_ratio || 1.0,
-              other.cache_creation_tokens_5m || 0,
-              other.cache_creation_ratio_5m ||
-                other.cache_creation_ratio ||
-                1.0,
-              other.cache_creation_tokens_1h || 0,
-              other.cache_creation_ratio_1h ||
-                other.cache_creation_ratio ||
-                1.0,
-            );
+            content = renderClaudeModelPrice(logOpts);
           } else {
-            content = renderModelPrice(
-              logs[i].prompt_tokens,
-              logs[i].completion_tokens,
-              other?.model_ratio,
-              other?.model_price,
-              other?.completion_ratio,
-              other?.group_ratio,
-              other?.user_group_ratio,
-              other?.cache_tokens || 0,
-              other?.cache_ratio || 1.0,
-              other?.image || false,
-              other?.image_ratio || 0,
-              other?.image_output || 0,
-              other?.web_search || false,
-              other?.web_search_call_count || 0,
-              other?.web_search_price || 0,
-              other?.file_search || false,
-              other?.file_search_call_count || 0,
-              other?.file_search_price || 0,
-              other?.audio_input_seperate_price || false,
-              other?.audio_input_token_count || 0,
-              other?.audio_input_price || 0,
-              other?.image_generation_call || false,
-              other?.image_generation_call_price || 0,
-            );
+            content = renderModelPrice(logOpts);
           }
           expandDataLocal.push({
             key: t('计费过程'),
@@ -570,6 +503,17 @@ export const useLogsData = () => {
           expandDataLocal.push({
             key: t('Reasoning Effort'),
             value: other.reasoning_effort,
+          });
+        }
+        if (other?.billing_mode === 'tiered_expr' && other?.expr_b64) {
+          expandDataLocal.push({
+            key: t('计费过程'),
+            value: renderTieredModelPrice({
+              ...other,
+              prompt_tokens: logs[i].prompt_tokens,
+              completion_tokens: logs[i].completion_tokens,
+              displayMode: billingDisplayMode,
+            }),
           });
         }
       }
@@ -584,7 +528,14 @@ export const useLogsData = () => {
           expandDataLocal.push({
             key: t('失败原因'),
             value: (
-              <div style={{ maxWidth: 600, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6 }}>
+              <div
+                style={{
+                  maxWidth: 600,
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.6,
+                }}
+              >
                 {other.reason}
               </div>
             ),
@@ -601,7 +552,8 @@ export const useLogsData = () => {
         const ss = other.stream_status;
         const isOk = ss.status === 'ok';
         const statusLabel = isOk ? '✓ ' + t('正常') : '✗ ' + t('异常');
-        let streamValue = statusLabel + ' (' + (ss.end_reason || 'unknown') + ')';
+        let streamValue =
+          statusLabel + ' (' + (ss.end_reason || 'unknown') + ')';
         if (ss.error_count > 0) {
           streamValue += ` [${t('软错误')}: ${ss.error_count}]`;
         }
@@ -616,7 +568,14 @@ export const useLogsData = () => {
           expandDataLocal.push({
             key: t('流错误详情'),
             value: (
-              <div style={{ maxWidth: 600, whiteSpace: 'pre-line', wordBreak: 'break-word', lineHeight: 1.6 }}>
+              <div
+                style={{
+                  maxWidth: 600,
+                  whiteSpace: 'pre-line',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.6,
+                }}
+              >
                 {ss.errors.join('\n')}
               </div>
             ),
@@ -625,7 +584,7 @@ export const useLogsData = () => {
       }
       if (Array.isArray(other?.po) && other.po.length > 0) {
         expandDataLocal.push({
-          key: t('鍙傛暟瑕嗙洊'),
+          key: t('参数覆盖'),
           value: (
             <ParamOverrideEntry
               count={other.po.length}
@@ -687,13 +646,13 @@ export const useLogsData = () => {
           ),
         });
       }
-      if (isAdminUser && logs[i].type !== 6) {
+      if (isAdminUser && logs[i].type !== 6 && logs[i].type !== 1) {
         expandDataLocal.push({
           key: t('请求转换'),
           value: requestConversionDisplayValue(other?.request_conversion),
         });
       }
-      if (isAdminUser && logs[i].type !== 6) {
+      if (isAdminUser && logs[i].type !== 6 && logs[i].type !== 1) {
         let localCountMode = '';
         if (other?.admin_info?.local_count_tokens) {
           localCountMode = t('本地计费');
@@ -704,6 +663,83 @@ export const useLogsData = () => {
           key: t('计费模式'),
           value: localCountMode,
         });
+      }
+      if (isAdminUser && logs[i].type === 1) {
+        const adminInfo = other?.admin_info;
+        if (adminInfo) {
+          if (adminInfo.payment_method) {
+            expandDataLocal.push({
+              key: t('订单支付方式'),
+              value: adminInfo.payment_method,
+            });
+          }
+          if (adminInfo.callback_payment_method) {
+            expandDataLocal.push({
+              key: t('回调支付方式'),
+              value: adminInfo.callback_payment_method,
+            });
+          }
+          if (adminInfo.caller_ip) {
+            expandDataLocal.push({
+              key: t('回调调用者IP'),
+              value: adminInfo.caller_ip,
+            });
+          }
+          if (adminInfo.server_ip) {
+            expandDataLocal.push({
+              key: t('服务器IP'),
+              value: adminInfo.server_ip,
+            });
+          }
+          if (adminInfo.node_name) {
+            expandDataLocal.push({
+              key: t('节点名称'),
+              value: adminInfo.node_name,
+            });
+          }
+          if (adminInfo.version) {
+            expandDataLocal.push({
+              key: t('系统版本'),
+              value: adminInfo.version,
+            });
+          }
+        } else {
+          expandDataLocal.push({
+            key: t('审计信息'),
+            value: (
+              <span style={{ color: 'var(--semi-color-warning)' }}>
+                {t(
+                  '该记录由旧版本实例写入，缺少审计信息，建议将实例升级至最新版本以便记录服务器IP、回调IP、支付方式与系统版本等审计字段。',
+                )}
+              </span>
+            ),
+          });
+        }
+      }
+      if (isAdminUser && logs[i].type === 3 && other?.admin_info) {
+        const adminInfo = other.admin_info;
+        const hasUsername =
+          adminInfo.admin_username !== undefined &&
+          adminInfo.admin_username !== null &&
+          adminInfo.admin_username !== '';
+        const hasId =
+          adminInfo.admin_id !== undefined &&
+          adminInfo.admin_id !== null &&
+          adminInfo.admin_id !== '';
+        if (hasUsername || hasId) {
+          let operatorValue = '';
+          if (hasUsername && hasId) {
+            operatorValue = `${adminInfo.admin_username} (ID: ${adminInfo.admin_id})`;
+          } else if (hasUsername) {
+            operatorValue = String(adminInfo.admin_username);
+          } else {
+            operatorValue = `ID: ${adminInfo.admin_id}`;
+          }
+          expandDataLocal.push({
+            key: t('操作管理员'),
+            value: operatorValue,
+          });
+        }
       }
       expandDatesLocal[logs[i].key] = expandDataLocal;
     }
@@ -736,8 +772,8 @@ export const useLogsData = () => {
           ? formLogType
           : logType;
 
-    const localStartTimestamp = toLocalUnixTimestamp(start_timestamp);
-    const localEndTimestamp = toLocalUnixTimestamp(end_timestamp);
+    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
+    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
     if (isAdminUser) {
       url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&request_id=${request_id}`;
     } else {
@@ -812,28 +848,6 @@ export const useLogsData = () => {
     }
   }, [formApi]);
 
-  useEffect(() => {
-    if (!formApi) {
-      return;
-    }
-
-    const currentSearchKey = searchParams.toString();
-    if (appliedSearchRef.current === currentSearchKey) {
-      return;
-    }
-
-    const shouldRefresh = appliedSearchRef.current !== '';
-    formApi.setValues(formInitValues);
-    setLogType(Number(formInitValues.logType) || 0);
-    appliedSearchRef.current = currentSearchKey;
-
-    if (shouldRefresh) {
-      setTimeout(() => {
-        refresh().then();
-      }, 0);
-    }
-  }, [formApi, formInitValues, refresh, searchParams]);
-
   // Check if any record has expandable content
   const hasExpandableRows = () => {
     return logs.some(
@@ -865,6 +879,8 @@ export const useLogsData = () => {
     visibleColumns,
     showColumnSelector,
     setShowColumnSelector,
+    billingDisplayMode,
+    setBillingDisplayMode,
     handleColumnVisibilityChange,
     handleSelectAll,
     initDefaultColumns,

@@ -25,21 +25,15 @@ import {
   Tooltip,
   Popover,
   Typography,
-  Button
 } from '@douyinfe/semi-ui';
 import {
-  timestamp2string,
   renderGroup,
   renderQuota,
   stringToColor,
   getLogOther,
   renderModelTag,
-  renderClaudeLogContent,
-  renderLogContent,
   renderModelPriceSimple,
-  renderAudioModelPrice,
-  renderClaudeModelPrice,
-  renderModelPrice,
+  renderTieredModelPriceSimple,
 } from '../../../helpers';
 import { IconHelpCircle } from '@douyinfe/semi-icons';
 import { CircleAlert, Route, Sparkles } from 'lucide-react';
@@ -150,10 +144,7 @@ function renderType(type, t) {
 
 function buildStreamStatusTooltip(ss, t) {
   if (!ss) return null;
-  const lines = [
-    t('流状态') + '：' + t('异常'),
-    (ss.end_reason || 'unknown'),
-  ];
+  const lines = [t('流状态') + '：' + t('异常'), ss.end_reason || 'unknown'];
   if (ss.error_count > 0) {
     lines.push(`${t('软错误')}: ${ss.error_count}`);
   }
@@ -191,11 +182,7 @@ function renderIsStream(bool, t, streamStatus) {
                 userSelect: 'none',
               }}
             >
-              <CircleAlert
-                size={14}
-                strokeWidth={2.5}
-                color='currentColor'
-              />
+              <CircleAlert size={14} strokeWidth={2.5} color='currentColor' />
             </span>
           </Tooltip>
         )}
@@ -376,6 +363,114 @@ function getPromptCacheSummary(other) {
   };
 }
 
+function normalizeDetailText(detail) {
+  return String(detail || '')
+    .replace(/\n\r/g, '\n')
+    .replace(/\r\n/g, '\n');
+}
+
+function getUsageLogGroupSummary(groupRatio, userGroupRatio, t) {
+  const parsedUserGroupRatio = Number(userGroupRatio);
+  const useUserGroupRatio =
+    Number.isFinite(parsedUserGroupRatio) && parsedUserGroupRatio !== -1;
+  const ratio = useUserGroupRatio ? userGroupRatio : groupRatio;
+  if (ratio === undefined || ratio === null || ratio === '') {
+    return '';
+  }
+  return `${useUserGroupRatio ? t('专属倍率') : t('分组')} ${formatRatio(ratio)}x`;
+}
+
+function renderCompactDetailSummary(summarySegments) {
+  const segments = Array.isArray(summarySegments)
+    ? summarySegments.filter((segment) => segment?.text)
+    : [];
+  if (!segments.length) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        maxWidth: 180,
+        lineHeight: 1.35,
+      }}
+    >
+      {segments.map((segment, index) => (
+        <Typography.Text
+          key={`${segment.text}-${index}`}
+          type={segment.tone === 'secondary' ? 'tertiary' : undefined}
+          size={segment.tone === 'secondary' ? 'small' : undefined}
+          style={{
+            display: 'block',
+            maxWidth: '100%',
+            fontSize: 12,
+            marginTop: index === 0 ? 0 : 2,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {segment.text}
+        </Typography.Text>
+      ))}
+    </div>
+  );
+}
+
+function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
+  const other = getLogOther(record.other);
+
+  if (record.type === 6) {
+    return {
+      segments: [{ text: t('异步任务退款'), tone: 'primary' }],
+    };
+  }
+
+  if (other == null || record.type !== 2) {
+    return null;
+  }
+
+  if (
+    other?.violation_fee === true ||
+    Boolean(other?.violation_fee_code) ||
+    Boolean(other?.violation_fee_marker)
+  ) {
+    const feeQuota = other?.fee_quota ?? record?.quota;
+    const groupText = getUsageLogGroupSummary(
+      other?.group_ratio,
+      other?.user_group_ratio,
+      t,
+    );
+    return {
+      segments: [
+        groupText ? { text: groupText, tone: 'primary' } : null,
+        { text: t('违规扣费'), tone: 'primary' },
+        {
+          text: `${t('扣费')}：${renderQuota(feeQuota, 6)}`,
+          tone: 'secondary',
+        },
+        text ? { text: `${t('详情')}：${text}`, tone: 'secondary' } : null,
+      ].filter(Boolean),
+    };
+  }
+
+  const summaryOpts = {
+    ...other,
+    displayMode: billingDisplayMode,
+    outputMode: 'segments',
+  };
+
+  if (other?.billing_mode === 'tiered_expr') {
+    return { segments: renderTieredModelPriceSimple(summaryOpts) };
+  }
+
+  return {
+    segments: other?.claude
+      ? renderModelPriceSimple({ ...summaryOpts, provider: 'claude' })
+      : renderModelPriceSimple({ ...summaryOpts, provider: 'openai' }),
+  };
+}
+
 export const getLogsColumns = ({
   t,
   COLUMN_KEYS,
@@ -383,6 +478,7 @@ export const getLogsColumns = ({
   showUserInfoFunc,
   openChannelAffinityUsageCacheModal,
   isAdminUser,
+  billingDisplayMode = 'price',
 }) => {
   return [
     {
@@ -395,43 +491,12 @@ export const getLogsColumns = ({
       title: t('渠道'),
       dataIndex: 'channel',
       render: (text, record, index) => {
-        if (
-          !(
-            record.type === 0 ||
-            record.type === 2 ||
-            record.type === 5 ||
-            record.type === 6
-          )
-        ) {
-          return <></>;
-        }
-
-        const other = getLogOther(record.other);
-        const baseUrlIndexRaw =
-          other?.base_url_index ?? other?.admin_info?.base_url_index;
-        const baseUrlIdRaw = other?.base_url_id ?? other?.admin_info?.base_url_id;
-        const baseUrlIndex =
-          baseUrlIndexRaw === undefined ||
-          baseUrlIndexRaw === null ||
-          baseUrlIndexRaw === ''
-            ? null
-            : baseUrlIndexRaw;
-        const baseUrlId =
-          baseUrlIdRaw === undefined || baseUrlIdRaw === null || baseUrlIdRaw === ''
-            ? null
-            : baseUrlIdRaw;
-
-        const channelId = record.channel ?? text;
-        const displayChannel =
-          baseUrlIndex === null ? `${channelId}` : `${channelId}-${baseUrlIndex}`;
-
         let isMultiKey = false;
         let multiKeyIndex = -1;
         let content = t('渠道') + `：${record.channel}`;
         let affinity = null;
         let showMarker = false;
-        let adminBaseUrl = null;
-
+        let other = getLogOther(record.other);
         if (other?.admin_info) {
           let adminInfo = other.admin_info;
           if (adminInfo?.is_multi_key) {
@@ -448,42 +513,26 @@ export const getLogsColumns = ({
             affinity = adminInfo.channel_affinity;
             showMarker = true;
           }
-          adminBaseUrl = adminInfo.base_url || null;
         }
 
-        const baseUrlIndexText = baseUrlIndex === null ? '-' : baseUrlIndex;
-        const baseUrlIdText = baseUrlId === null ? '-' : baseUrlId;
-
-        const tooltipContent = isAdminUser ? (
-          <div style={{ lineHeight: 1.6 }}>
-            <div>{record.channel_name || t('未知渠道')}</div>
-            <div>base_url_index：{baseUrlIndexText}</div>
-            <div>base_url_id：{baseUrlIdText}</div>
-            {adminBaseUrl ? (
-              <div style={{ wordBreak: 'break-all' }}>base_url：{adminBaseUrl}</div>
-            ) : null}
-          </div>
-        ) : (
-          <div style={{ lineHeight: 1.6 }}>
-            <div>base_url_index：{baseUrlIndexText}</div>
-            <div>base_url_id：{baseUrlIdText}</div>
-          </div>
-        );
-
-        return (
+        return isAdminUser &&
+          (record.type === 0 ||
+            record.type === 2 ||
+            record.type === 5 ||
+            record.type === 6) ? (
           <Space>
             <span style={{ position: 'relative', display: 'inline-block' }}>
-              <Tooltip content={tooltipContent}>
+              <Tooltip content={record.channel_name || t('未知渠道')}>
                 <span>
                   <Tag
                     color={colors[parseInt(text) % colors.length]}
                     shape='circle'
                   >
-                    {displayChannel}
+                    {text}
                   </Tag>
                 </span>
               </Tooltip>
-              {isAdminUser && showMarker && (
+              {showMarker && (
                 <Tooltip
                   content={
                     <div style={{ lineHeight: 1.6 }}>
@@ -522,13 +571,13 @@ export const getLogsColumns = ({
                 </Tooltip>
               )}
             </span>
-            {isAdminUser && isMultiKey && (
+            {isMultiKey && (
               <Tag color='white' shape='circle'>
                 {multiKeyIndex}
               </Tag>
             )}
           </Space>
-        );
+        ) : null;
       },
     },
     {
@@ -561,7 +610,10 @@ export const getLogsColumns = ({
       title: t('令牌'),
       dataIndex: 'token_name',
       render: (text, record, index) => {
-        return record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6 ? (
+        return record.type === 0 ||
+          record.type === 2 ||
+          record.type === 5 ||
+          record.type === 6 ? (
           <div>
             <Tag
               color='grey'
@@ -584,7 +636,12 @@ export const getLogsColumns = ({
       title: t('分组'),
       dataIndex: 'group',
       render: (text, record, index) => {
-        if (record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6) {
+        if (
+          record.type === 0 ||
+          record.type === 2 ||
+          record.type === 5 ||
+          record.type === 6
+        ) {
           if (record.group) {
             return <>{renderGroup(record.group)}</>;
           } else {
@@ -624,7 +681,10 @@ export const getLogsColumns = ({
       title: t('模型'),
       dataIndex: 'model_name',
       render: (text, record, index) => {
-        return record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6 ? (
+        return record.type === 0 ||
+          record.type === 2 ||
+          record.type === 5 ||
+          record.type === 6 ? (
           <>{renderModelName(record, copyText, t)}</>
         ) : (
           <></>
@@ -691,7 +751,10 @@ export const getLogsColumns = ({
           cacheText = `${t('缓存写')} ${formatTokenCount(cacheSummary.cacheWriteTokens)}`;
         }
 
-        return record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6 ? (
+        return record.type === 0 ||
+          record.type === 2 ||
+          record.type === 5 ||
+          record.type === 6 ? (
           <div
             style={{
               display: 'inline-flex',
@@ -725,7 +788,10 @@ export const getLogsColumns = ({
       dataIndex: 'completion_tokens',
       render: (text, record, index) => {
         return parseInt(text) > 0 &&
-          (record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6) ? (
+          (record.type === 0 ||
+            record.type === 2 ||
+            record.type === 5 ||
+            record.type === 6) ? (
           <>{<span> {text} </span>}</>
         ) : (
           <></>
@@ -737,7 +803,14 @@ export const getLogsColumns = ({
       title: t('花费'),
       dataIndex: 'quota',
       render: (text, record, index) => {
-        if (!(record.type === 0 || record.type === 2 || record.type === 5 || record.type === 6)) {
+        if (
+          !(
+            record.type === 0 ||
+            record.type === 2 ||
+            record.type === 5 ||
+            record.type === 6
+          )
+        ) {
           return <></>;
         }
         const other = getLogOther(record.other);
@@ -769,7 +842,12 @@ export const getLogsColumns = ({
       ),
       dataIndex: 'ip',
       render: (text, record, index) => {
-        return (record.type === 2 || record.type === 5) && text ? (
+        const showIp =
+          (record.type === 2 ||
+            record.type === 5 ||
+            (isAdminUser && record.type === 1)) &&
+          text;
+        return showIp ? (
           <Tooltip content={text}>
             <span>
               <Tag
@@ -804,9 +882,9 @@ export const getLogsColumns = ({
           }
           if (other.admin_info !== undefined) {
             if (
-                other.admin_info.use_channel !== null &&
-                other.admin_info.use_channel !== undefined &&
-                other.admin_info.use_channel !== ''
+              other.admin_info.use_channel !== null &&
+              other.admin_info.use_channel !== undefined &&
+              other.admin_info.use_channel !== ''
             ) {
               let useChannel = other.admin_info.use_channel;
               let useChannelStr = useChannel.join('->');
@@ -822,19 +900,16 @@ export const getLogsColumns = ({
       title: t('详情'),
       dataIndex: 'content',
       fixed: 'right',
+      width: 200,
       render: (text, record, index) => {
-        let other = getLogOther(record.other);
-        if (record.type === 6) {
-          return (
-            <Typography.Paragraph
-              ellipsis={{ rows: 2 }}
-              style={{ maxWidth: 240 }}
-            >
-              {t('异步任务退款')}
-            </Typography.Paragraph>
-          );
-        }
-        if (other == null || record.type !== 2) {
+        const detailSummary = getUsageLogDetailSummary(
+          record,
+          text,
+          billingDisplayMode,
+          t,
+        );
+
+        if (!detailSummary) {
           return (
             <Typography.Paragraph
               ellipsis={{
@@ -844,95 +919,14 @@ export const getLogsColumns = ({
                   opts: { style: { width: 240 } },
                 },
               }}
-              style={{ maxWidth: 240 }}
+              style={{ maxWidth: 200, marginBottom: 0 }}
             >
               {text}
             </Typography.Paragraph>
           );
         }
 
-        if (
-          other?.violation_fee === true ||
-          Boolean(other?.violation_fee_code) ||
-          Boolean(other?.violation_fee_marker)
-        ) {
-          const feeQuota = other?.fee_quota ?? record?.quota;
-          const ratioText = formatRatio(other?.group_ratio);
-          const summary = [
-            t('违规扣费'),
-            `${t('分组倍率')}：${ratioText}`,
-            `${t('扣费')}：${renderQuota(feeQuota, 6)}`,
-            text ? `${t('详情')}：${text}` : null,
-          ]
-            .filter(Boolean)
-            .join('\n');
-          return (
-            <Typography.Paragraph
-              ellipsis={{
-                rows: 2,
-                showTooltip: {
-                  type: 'popover',
-                  opts: { style: { width: 240 } },
-                },
-              }}
-              style={{ maxWidth: 240, whiteSpace: 'pre-line' }}
-            >
-              {summary}
-            </Typography.Paragraph>
-          );
-        }
-
-        let content = other?.claude
-          ? renderModelPriceSimple(
-              other.model_ratio,
-              other.model_price,
-              other.group_ratio,
-              other?.user_group_ratio,
-              other.cache_tokens || 0,
-              other.cache_ratio || 1.0,
-              other.cache_creation_tokens || 0,
-              other.cache_creation_ratio || 1.0,
-              other.cache_creation_tokens_5m || 0,
-              other.cache_creation_ratio_5m ||
-                other.cache_creation_ratio ||
-                1.0,
-              other.cache_creation_tokens_1h || 0,
-              other.cache_creation_ratio_1h ||
-                other.cache_creation_ratio ||
-                1.0,
-              false,
-              1.0,
-              other?.is_system_prompt_overwritten,
-              'claude',
-            )
-          : renderModelPriceSimple(
-              other.model_ratio,
-              other.model_price,
-              other.group_ratio,
-              other?.user_group_ratio,
-              other.cache_tokens || 0,
-              other.cache_ratio || 1.0,
-              0,
-              1.0,
-              0,
-              1.0,
-              0,
-              1.0,
-              false,
-              1.0,
-              other?.is_system_prompt_overwritten,
-              'openai',
-            );
-        return (
-            <Typography.Paragraph
-                ellipsis={{
-                  rows: 3,
-                }}
-                style={{ maxWidth: 240, whiteSpace: 'pre-line' }}
-            >
-              {content}
-            </Typography.Paragraph>
-        );
+        return renderCompactDetailSummary(detailSummary.segments);
       },
     },
   ];

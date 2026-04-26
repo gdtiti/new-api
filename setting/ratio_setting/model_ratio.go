@@ -146,6 +146,12 @@ var defaultModelRatio = map[string]float64{
 	"claude-opus-4-6-high":                      2.5,
 	"claude-opus-4-6-medium":                    2.5,
 	"claude-opus-4-6-low":                       2.5,
+	"claude-opus-4-7":                           2.5,
+	"claude-opus-4-7-max":                       2.5,
+	"claude-opus-4-7-xhigh":                     2.5,
+	"claude-opus-4-7-high":                      2.5,
+	"claude-opus-4-7-medium":                    2.5,
+	"claude-opus-4-7-low":                       2.5,
 	"claude-3-opus-20240229":                    7.5, // $15 / 1M tokens
 	"claude-opus-4-20250514":                    7.5,
 	"claude-opus-4-1-20250805":                  7.5,
@@ -471,6 +477,15 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 		}
 		// gpt-5 匹配
 		if strings.HasPrefix(name, "gpt-5") {
+			if strings.HasPrefix(name, "gpt-5.5") {
+				return 6, true
+			}
+			if strings.HasPrefix(name, "gpt-5.4") {
+				if strings.HasPrefix(name, "gpt-5.4-nano") {
+					return 6.25, true
+				}
+				return 6, true
+			}
 			return 8, true
 		}
 		// gpt-4.5-preview匹配
@@ -601,6 +616,39 @@ func ContainsAudioCompletionRatio(name string) bool {
 	return ok
 }
 
+type CompletionRatioInfo struct {
+	CompletionRatio      float64  `json:"completion_ratio"`
+	CacheRatio           *float64 `json:"cache_ratio,omitempty"`
+	CreateCacheRatio     *float64 `json:"create_cache_ratio,omitempty"`
+	ImageRatio           *float64 `json:"image_ratio,omitempty"`
+	AudioRatio           *float64 `json:"audio_ratio,omitempty"`
+	AudioCompletionRatio *float64 `json:"audio_completion_ratio,omitempty"`
+}
+
+func GetCompletionRatioInfo(name string) CompletionRatioInfo {
+	info := CompletionRatioInfo{
+		CompletionRatio: GetCompletionRatio(name),
+	}
+	if cacheRatio, ok := GetCacheRatio(name); ok {
+		info.CacheRatio = &cacheRatio
+	}
+	if createCacheRatio, ok := GetCreateCacheRatio(name); ok {
+		info.CreateCacheRatio = &createCacheRatio
+	}
+	if imageRatio, ok := GetImageRatio(name); ok {
+		info.ImageRatio = &imageRatio
+	}
+	if ContainsAudioRatio(name) {
+		audioRatio := GetAudioRatio(name)
+		info.AudioRatio = &audioRatio
+	}
+	if ContainsAudioCompletionRatio(name) {
+		audioCompletionRatio := GetAudioCompletionRatio(name)
+		info.AudioCompletionRatio = &audioCompletionRatio
+	}
+	return info
+}
+
 func ModelRatio2JSONString() string {
 	return modelRatioMap.MarshalJSONString()
 }
@@ -654,6 +702,18 @@ func GetModelPriceCopy() map[string]float64 {
 
 func GetCompletionRatioCopy() map[string]float64 {
 	return completionRatioMap.ReadAll()
+}
+
+func GetImageRatioCopy() map[string]float64 {
+	return imageRatioMap.ReadAll()
+}
+
+func GetAudioRatioCopy() map[string]float64 {
+	return audioRatioMap.ReadAll()
+}
+
+func GetAudioCompletionRatioCopy() map[string]float64 {
+	return audioCompletionRatioMap.ReadAll()
 }
 
 // 转换模型名，减少渠道必须配置各种带参数模型
