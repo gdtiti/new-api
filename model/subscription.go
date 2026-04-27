@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -58,6 +59,7 @@ const (
 var (
 	subscriptionPlanCacheOnce     sync.Once
 	subscriptionPlanInfoCacheOnce sync.Once
+	subscriptionAutoGrantSeq      atomic.Int64
 
 	subscriptionPlanCache     *cachex.HybridCache[SubscriptionPlan]
 	subscriptionPlanInfoCache *cachex.HybridCache[SubscriptionPlanInfo]
@@ -556,6 +558,97 @@ func initSubscriptionResetState(sub *UserSubscription, plan *SubscriptionPlan, n
 	}
 }
 
+func applyPlanRuntimeSettingsToSubscription(sub *UserSubscription, plan *SubscriptionPlan, nowUnix int64) {
+	if sub == nil || plan == nil {
+		return
+	}
+	previousResetPeriod := NormalizeResetPeriod(sub.QuotaResetPeriod)
+	previousResetCustomSeconds := sub.QuotaResetCustomSeconds
+
+	sub.AmountTotal = plan.TotalAmount
+	sub.QuotaResetPeriod = plan.QuotaResetPeriod
+	sub.QuotaResetCustomSeconds = plan.QuotaResetCustomSeconds
+	sub.AllowStacking = plan.AllowStacking
+	sub.AllowContinuation = plan.AllowContinuation
+	sub.ActivationMode = NormalizeActivationMode(plan.ActivationMode)
+	sub.UpgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
+
+	if sub.Status != SubscriptionStatusActive {
+		sub.LastResetTime = 0
+		sub.NextResetTime = 0
+		return
+	}
+	nextPeriod := NormalizeResetPeriod(plan.QuotaResetPeriod)
+	if nextPeriod == SubscriptionResetNever {
+		sub.LastResetTime = 0
+		sub.NextResetTime = 0
+		return
+	}
+	resetConfigChanged := previousResetPeriod != nextPeriod ||
+		previousResetCustomSeconds != plan.QuotaResetCustomSeconds
+	if sub.NextResetTime <= 0 || resetConfigChanged {
+		sub.LastResetTime = nowUnix
+		sub.NextResetTime = calcNextResetTime(time.Unix(nowUnix, 0), plan, sub.EndTime)
+	}
+}
+
+func syncOpenUserSubscriptionsWithPlanTx(tx *gorm.DB, plan *SubscriptionPlan, now int64) ([]int, error) {
+	if tx == nil || plan == nil || plan.Id <= 0 {
+		return nil, errors.New("invalid subscription plan sync args")
+	}
+	plan.QuotaResetPeriod = NormalizeResetPeriod(plan.QuotaResetPeriod)
+	plan.ActivationMode = NormalizeActivationMode(plan.ActivationMode)
+	plan.UpgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
+
+	var subs []UserSubscription
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		Where("plan_id = ? AND status IN ?", plan.Id, []string{SubscriptionStatusActive, SubscriptionStatusQueued}).
+		Order("user_id asc, id asc").
+		Find(&subs).Error; err != nil {
+		return nil, err
+	}
+	if len(subs) == 0 {
+		return nil, nil
+	}
+	userSet := make(map[int]struct{})
+	for _, candidate := range subs {
+		sub := candidate
+		applyPlanRuntimeSettingsToSubscription(&sub, plan, now)
+		if err := tx.Save(&sub).Error; err != nil {
+			return nil, err
+		}
+		if sub.UserId > 0 {
+			userSet[sub.UserId] = struct{}{}
+		}
+	}
+	userIds := make([]int, 0, len(userSet))
+	for userId := range userSet {
+		userIds = append(userIds, userId)
+	}
+	return userIds, nil
+}
+
+func SyncOpenUserSubscriptionsWithPlanTx(tx *gorm.DB, plan *SubscriptionPlan, now int64) ([]int, error) {
+	userIds, err := syncOpenUserSubscriptionsWithPlanTx(tx, plan, now)
+	if err != nil {
+		return nil, err
+	}
+	for _, userId := range userIds {
+		if err := refreshUserSubscriptionsTx(tx, userId, now); err != nil {
+			return nil, err
+		}
+	}
+	return userIds, nil
+}
+
+func buildAutoSubscriptionGrantKey(source string, userId int, planId int) string {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		source = "subscription"
+	}
+	return fmt.Sprintf("%s:%d:%d:%d:%d", source, userId, planId, time.Now().UnixNano(), subscriptionAutoGrantSeq.Add(1))
+}
+
 func activateUserSubscriptionTx(tx *gorm.DB, sub *UserSubscription, now int64) error {
 	if tx == nil || sub == nil {
 		return errors.New("invalid activate args")
@@ -586,6 +679,10 @@ func activateUserSubscriptionTx(tx *gorm.DB, sub *UserSubscription, now int64) e
 }
 
 func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string) (*UserSubscription, error) {
+	return createUserSubscriptionFromPlanTx(tx, userId, plan, source, "")
+}
+
+func createUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string, grantKey string) (*UserSubscription, error) {
 	if tx == nil {
 		return nil, errors.New("tx is nil")
 	}
@@ -653,6 +750,10 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	}
 	upgradeGroup := strings.TrimSpace(plan.UpgradeGroup)
 	prevGroup := ""
+	grantKey = strings.TrimSpace(grantKey)
+	if grantKey == "" {
+		grantKey = buildAutoSubscriptionGrantKey(source, userId, plan.Id)
+	}
 	status := SubscriptionStatusActive
 	activatedAt := nowUnix
 	if startUnix > nowUnix {
@@ -691,6 +792,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		EndTime:                 endUnix,
 		Status:                  status,
 		Source:                  source,
+		GrantKey:                grantKey,
 		UpgradeGroup:            upgradeGroup,
 		PrevUserGroup:           prevGroup,
 		CreatedAt:               common.GetTimestamp(),
@@ -1007,12 +1109,8 @@ func GrantRegisterDefaultSubscription(userId int) (string, string, error) {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return result.Error
 		}
-		sub, err := CreateUserSubscriptionFromPlanTx(tx, userId, &plan, source)
+		sub, err := createUserSubscriptionFromPlanTx(tx, userId, &plan, source, grantKey)
 		if err != nil {
-			return err
-		}
-		sub.GrantKey = grantKey
-		if err = tx.Model(sub).Update("grant_key", grantKey).Error; err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "duplicate") {
 				status = "already_exists"
 				return nil
@@ -1345,10 +1443,8 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 	if tx == nil || sub == nil || plan == nil {
 		return errors.New("invalid reset args")
 	}
-	plan = buildSubscriptionSnapshotPlan(sub)
-	if plan == nil {
-		return errors.New("invalid subscription snapshot")
-	}
+	plan.QuotaResetPeriod = NormalizeResetPeriod(plan.QuotaResetPeriod)
+	plan.ActivationMode = NormalizeActivationMode(plan.ActivationMode)
 	if sub.NextResetTime > 0 && sub.NextResetTime > now {
 		return nil
 	}
@@ -1371,10 +1467,12 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 		if sub.NextResetTime == 0 && next > 0 {
 			sub.NextResetTime = next
 			sub.LastResetTime = base.Unix()
+			sub.AmountTotal = plan.TotalAmount
 			return tx.Save(sub).Error
 		}
 		return nil
 	}
+	sub.AmountTotal = plan.TotalAmount
 	sub.AmountUsed = 0
 	sub.LastResetTime = base.Unix()
 	sub.NextResetTime = next

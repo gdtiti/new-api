@@ -30,6 +30,7 @@ func isRedeemBusinessError(err error) bool {
 	var businessErr *redeemBusinessError
 	return errors.As(err, &businessErr)
 }
+
 type Redemption struct {
 	Id                    int            `json:"id"`
 	UserId                int            `json:"user_id"`
@@ -245,15 +246,12 @@ func Redeem(key string, userId int) (*RedeemResult, error) {
 			if !plan.Enabled {
 				return newRedeemBusinessError("兑换码对应的订阅套餐已禁用")
 			}
-			subscription, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, "redemption")
+			grantKey := fmt.Sprintf("redemption:%d:user:%d", redemption.Id, userId)
+			subscription, err := createUserSubscriptionFromPlanTx(tx, userId, plan, "redemption", grantKey)
 			if err != nil {
 				if strings.Contains(err.Error(), "购买上限") {
 					return newRedeemBusinessError(err.Error())
 				}
-				return err
-			}
-			grantKey := fmt.Sprintf("redemption:%d:user:%d", redemption.Id, userId)
-			if err := tx.Model(subscription).Update("grant_key", grantKey).Error; err != nil {
 				if isDuplicateConstraintError(err) {
 					return newRedeemBusinessError("你已兑换过该兑换码")
 				}

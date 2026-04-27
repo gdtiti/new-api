@@ -249,6 +249,9 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		if err := tx.Model(&model.SubscriptionPlan{}).Where("id = ?", id).Updates(updateMap).Error; err != nil {
 			return err
 		}
+		if _, err := model.SyncOpenUserSubscriptionsWithPlanTx(tx, &req.Plan, model.GetDBTimestamp()); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
